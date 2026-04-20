@@ -1,0 +1,1480 @@
+-- ============================================================
+--  FUNNY HUB V3 — Full mshub movement + anti-entity merge
+--  For OFFLINE / private Doors game use only
+-- ============================================================
+
+-- ── ANTI-IDLE ────────────────────────────────────────────────
+game:GetService("Players").LocalPlayer.Idled:Connect(function()
+    game:GetService("VirtualUser"):CaptureController()
+    game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+end)
+
+-- ── SERVICES ─────────────────────────────────────────────────
+local Players               = game:GetService("Players")
+local CoreGui               = game:GetService("CoreGui")
+local RunService            = game:GetService("RunService")
+local ReplicatedStorage     = game:GetService("ReplicatedStorage")
+local TweenService          = game:GetService("TweenService")
+local PathfindingService    = game:GetService("PathfindingService")
+local ProximityPromptService= game:GetService("ProximityPromptService")
+local Debris                = game:GetService("Debris")
+local Lighting              = game:GetService("Lighting")
+local UIS                   = game:GetService("UserInputService")
+local player                = Players.LocalPlayer
+
+-- ── REMOTES ──────────────────────────────────────────────────
+local RemotesFolder = ReplicatedStorage:WaitForChild("RemotesFolder", 5)
+local function safeFireServer(remoteName, ...)
+    local args = {...}
+    pcall(function()
+        local remote = RemotesFolder and RemotesFolder:FindFirstChild(remoteName)
+        if remote then remote:FireServer(unpack(args)) end
+    end)
+end
+
+-- ── MODULE REFS ──────────────────────────────────────────────
+-- entityModules: used to rename Shade (Halt) module client-side
+local entityModules = nil
+pcall(function()
+    entityModules = ReplicatedStorage
+        :WaitForChild("ClientModules", 5)
+        :WaitForChild("EntityModules", 5)
+end)
+
+local function applyAntiSurge()
+    pcall(function()
+        local SurgeCheck = require(ReplicatedStorage.ModulesShared.SurgeCheck)
+        SurgeCheck.GetUncoveredPosition = function() return nil end
+    end)
+end
+
+local function firePrompt(prompt)
+    if not (prompt and prompt.Parent and prompt.Enabled) then return end
+    if typeof(fireproximityprompt) == "function" then
+        pcall(fireproximityprompt, prompt)
+    else
+        pcall(function()
+            prompt:InputHoldBegin()
+            task.delay(math.max(prompt.HoldDuration, 0) + 0.05, function()
+                pcall(function() prompt:InputHoldEnd() end)
+            end)
+        end)
+    end
+end
+
+-- ── MAIN_GAME MODULE CACHE ───────────────────────────────────
+local _mgCache = nil
+local function getMainGame()
+    if _mgCache then return _mgCache end
+    local ok, r = pcall(function()
+        return require(player.PlayerGui.MainUI.Initiator.Main_Game)
+    end)
+    if ok then _mgCache = r end
+    return _mgCache
+end
+
+-- ============================================================
+--  CHARACTER SETUP  (mirrors LX Doors exactly)
+-- ============================================================
+local collisionClone = nil
+
+local function setupCharacter(char)
+    _mgCache = nil
+    isMinesBypassed = false
+    pcall(function()
+        -- Mines AC Bypass listener (Ladder Bypass)
+        char:GetAttributeChangedSignal("Climbing"):Connect(function()
+            if isMinesBypassActive and char:GetAttribute("Climbing") and not isMinesBypassed then
+                task.wait(1)
+                char:SetAttribute("Climbing", false)
+                isMinesBypassed = true
+                pcall(function()
+                    if typeof(showEntityNotification) == "function" then
+                        showEntityNotification("Mines Anticheat Bypassed")
+                    end
+                end)
+            end
+        end)
+
+        local collision = char:WaitForChild("Collision", 5)
+        if not collision then collision = char:WaitForChild("CollisionPart", 5) end
+        if not collision then return end
+        if collisionClone then pcall(function() collisionClone:Destroy() end) end
+        collisionClone                          = collision:Clone()
+        collisionClone.Name                     = "_CollisionClone"
+        collisionClone.Massless                 = true
+        collisionClone.CanCollide               = false
+        collisionClone.CanQuery                 = false
+        collisionClone.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0.7, 0, 1, 1)
+        local cc = collisionClone:FindFirstChild("CollisionCrouch")
+        if cc then cc:Destroy() end
+        collisionClone.Parent = char
+    end)
+end
+
+player.CharacterAdded:Connect(setupCharacter)
+if player.Character then task.spawn(setupCharacter, player.Character) end
+
+-- ============================================================
+--  STATE
+-- ============================================================
+local avoidEnabled    = false
+local avoidActive     = false
+local walkSpeedValue  = 16
+local orbitSpeed      = 1
+local orbitRadius     = 7
+local isLXBypassActive = false
+local isMinesBypassActive = false
+local isMinesBypassed = false
+local ladderHLConn = nil
+
+-- ── LX SPEED BYPASS LOOP (exact LX Doors implementation) ────
+task.spawn(function()
+    while task.wait(0.23) do
+        if not isLXBypassActive then continue end
+        if not (collisionClone and collisionClone.Parent) then continue end
+        pcall(function()
+            collisionClone.Massless = false
+            task.wait(0.23)
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if root and root.Anchored then
+                collisionClone.Massless = true
+                task.wait(2)
+            end
+            collisionClone.Massless = true
+        end)
+    end
+end)
+
+local isAutoHeartbeatActive = false
+local isAutoBreakerActive   = false
+
+local isDoorEspActive       = false
+local doorEspCache          = {}
+
+local activeEntities = {}
+local entList = {
+    "rushmoving","ambushmoving","eyes","screech","halt","seekmoving",
+    "figure","glitch","a60","a90","a120","backdoorrush","mandrake",
+    "blitz","haste","vacuum","giggle","grumble","lookman","rush",
+    "ambush","guidinglight","curiouslight","hide","jack","timothy",
+    "groundskeeper","monumententity","lanternhead"
+}
+
+-- Feature flags
+local isEspActive               = false
+local isItemEspActive           = false
+local isPlayerEspActive         = false
+local isFullbrightActive        = false
+local isInstaInteractActive     = false
+local isNoClipActive            = false
+local isLootAuraActive          = false
+local isAutoLibraryActive       = false
+local isTrickFigureActive       = false
+local isNoVignetteActive        = false
+local isNoAmbienceActive        = false
+local isNoAnimActive            = false
+local isAutoCrouchActive        = false
+local isInfItemsActive          = false
+local isAntiSnareActive         = false
+local isAntiSeekActive          = false
+local isAntiEyesActive          = false
+local isAntiScreechActive       = false
+local isAntiA90Active           = false
+local isAntiSurgeActive         = false
+local isAntiDupeActive          = false
+local isAntiHaltActive          = false
+local isAntiGiggleActive        = false
+local isAntiGloomEggActive      = false
+local isSpamming                = false
+local isAutoLookMonumentsActive = false
+local isAntiGroundskeeperActive = false
+local wasGkHigh                 = false
+local isBringing                = false
+
+-- ── AUTO LOOT ────────────────────────────────────────────────
+local openOnlyTargets = {
+    Knobs=true, ChestBox=true, ChestBoxLocked=true, RolltopContainer=true,
+    Toolshed_Small=true, Toolbox=true, Door=true, Metal=true, Chest_Vine=true,
+    DrawerDoors=true, Knob=true
+}
+local generalTargets = {
+    Flashlight=true, SkullLock=true, Bandage=true, GoldPile=true,
+    Candle=true, KeyObtain=true, Lockpick=true, LootPrompt=true,
+    Battery=true, Crucifix=true, Lock=true, Smoothie=true,
+    LeverForGate=true, LibraryHintPaper=true, LiveHintBook=true,
+    Lighter=true, Vitamins=true, Shakelight=true, TipJar=true,
+    Cheese=true, GweenSoda=true, Bread=true, BatteryPack=true,
+    BandagePack=true, LaserPointer=true, Shears=true, Glowsticks=true,
+    AloeVera=true, StarJug=true, StarBottle=true, Straplight=true,
+    GoldGun=true, SkeletonKey=true, Donut=true, Bulklight=true,
+    RiftCandle=true, StarVial=true, Multitool=true, Lantern=true,
+    RiftSmoothie=true, Compass=true, RiftJar=true, Cellar=true,
+    ElectricalKeyObtain=true, LiveBreakerPolePickup=true, FuseObtain=true,
+    Lever=true, Button=true, ["2"]=true, ["3"]=true, ["1"]=true,
+    CuttableVines=true, LotusPetalPickup=true, IronKeyForCrypt=true,
+    LanternLitItem=true, DoorPart=true, Wheel=true, LotusHolder=true,
+    KeyIron=true, TimerLever=true, VentGrate=true
+}
+
+local objectsenabled    = {}
+local lastRoomObjects   = {}
+local roomLastTime      = -1
+local lootEnabledInRoom = true
+local lootRoomConn      = nil
+
+local function checkAndAddObject(obj)
+    if not obj:IsA("ProximityPrompt") then return end
+    local parent = obj.Parent
+    if not parent then return end
+    local pName  = parent.Name
+    local shouldAdd = false
+    if openOnlyTargets[pName] then
+        if obj.ActionText == "Loot" then shouldAdd = true end
+    elseif generalTargets[pName] then
+        shouldAdd = true
+    end
+    if shouldAdd then
+        pcall(function() obj.RequiresLineOfSight = false end)
+        if not objectsenabled[obj] and not table.find(lastRoomObjects, obj) then
+            table.insert(lastRoomObjects, obj)
+        end
+    end
+end
+
+local function setupRoomTracking(roomModel)
+    if lootRoomConn then lootRoomConn:Disconnect() end
+    lastRoomObjects = {}
+    objectsenabled  = {}
+    for _, v in ipairs(roomModel:GetDescendants()) do checkAndAddObject(v) end
+    lootRoomConn = roomModel.DescendantAdded:Connect(checkAndAddObject)
+end
+
+-- ── INSTA-INTERACT ───────────────────────────────────────────
+local promptHoldCache = {}
+local promptAddedConn = nil
+
+local function setupInstaInteract(state)
+    if not state then
+        for prompt, dur in pairs(promptHoldCache) do
+            pcall(function() if prompt and prompt.Parent then prompt.HoldDuration = dur end end)
+        end
+        promptHoldCache = {}
+        if promptAddedConn then promptAddedConn:Disconnect(); promptAddedConn = nil end
+        return
+    end
+    for _, v in workspace:GetDescendants() do
+        if v:IsA("ProximityPrompt") and not promptHoldCache[v] then
+            promptHoldCache[v] = v.HoldDuration
+            v.HoldDuration     = 0
+        end
+    end
+    promptAddedConn = workspace.DescendantAdded:Connect(function(v)
+        if v:IsA("ProximityPrompt") and not promptHoldCache[v] then
+            promptHoldCache[v] = v.HoldDuration
+            v.HoldDuration     = 0
+        end
+    end)
+end
+
+-- ============================================================
+--  ANTI-ENTITY — ALL METHODS FROM MSHUB
+-- ============================================================
+
+-- ── ANTI-SCREECH (LX Doors hookfunction method) ──────────────
+local screechHookFn = nil
+local function setupScreechHook()
+    pcall(function()
+        local mg = player.PlayerGui:WaitForChild("MainUI", 5)
+                    :WaitForChild("Initiator", 5)
+                    :WaitForChild("Main_Game", 5)
+                    :WaitForChild("RemoteListener", 5)
+                    :WaitForChild("Modules", 5)
+        local screechMod = mg:FindFirstChild("Screech")
+        if not screechMod then return end
+        local fn = require(screechMod)
+        screechHookFn = hookfunction(fn, newcclosure(function(...)
+            if isAntiScreechActive then
+                pcall(function() RemotesFolder.Screech:FireServer(true) end)
+                return
+            end
+            return screechHookFn(...)
+        end))
+    end)
+end
+task.spawn(setupScreechHook)
+player.PlayerGui.ChildAdded:Connect(function(v)
+    if v.Name == "MainUI" then
+        task.delay(0.5, setupScreechHook)
+    end
+end)
+
+local function setAntiScreech(state)
+    isAntiScreechActive = state
+    -- The hook function already checks isAntiScreechActive, so no extra action needed.
+end
+
+-- ── ANTI-A90 ─────────────────────────────────────────────────
+local function setAntiA90(state)
+    pcall(function()
+        local mg = getMainGame()
+        if not mg then return end
+        local mod = mg:FindFirstChild("A90", true)
+                 or mg:FindFirstChild("_A90", true)
+        if mod then mod.Name = state and "_A90" or "A90" end
+    end)
+end
+
+-- ── ANTI-HALT ────────────────────────────────────────────────
+local function setAntiHalt(state)
+    pcall(function()
+        if not entityModules then return end
+        local mod = entityModules:FindFirstChild("Shade")
+                 or entityModules:FindFirstChild("_Shade")
+        if mod then mod.Name = state and "_Shade" or "Shade" end
+    end)
+end
+
+-- ── ANTI-DUPE (LX Doors exact method) ────────────────────────
+local function disableDupeRoom(dupeRoom, state)
+    pcall(function()
+        local hidden = dupeRoom:FindFirstChild("Hidden")
+        if hidden then hidden.CanTouch = not state end
+        local lock = dupeRoom:FindFirstChild("LockPart")
+        if lock then
+            local up = lock:FindFirstChild("UnlockPrompt")
+            if up then up.Enabled = not state end
+        end
+    end)
+end
+
+local antiDupeConn = nil
+local function setupAntiDupe(state)
+    if antiDupeConn then antiDupeConn:Disconnect(); antiDupeConn = nil end
+    pcall(function()
+        for _, v in workspace.CurrentRooms:GetDescendants() do
+            if v.Name == "DoorFake" and v:IsA("Model") then
+                disableDupeRoom(v, state)
+            end
+        end
+        if not state then return end
+        antiDupeConn = workspace.CurrentRooms.DescendantAdded:Connect(function(v)
+            if v.Name == "DoorFake" and v:IsA("Model") then
+                task.spawn(disableDupeRoom, v, true)
+            end
+        end)
+    end)
+end
+
+-- ── ANTI-SEEK OBSTRUCTIONS (LX Doors exact method) ──────────
+local antiSeekConn = nil
+local function setupAntiSeek(state)
+    if antiSeekConn then antiSeekConn:Disconnect(); antiSeekConn = nil end
+    pcall(function()
+        for _, v in workspace.CurrentRooms:GetDescendants() do
+            if v.Name == "HurtPart" and v:IsA("Part") and v.Parent and v.Parent.Name == "ChandelierObstruction" then
+                v.CanTouch = not state
+            elseif v.Name == "AnimatorPart" and v:IsA("Part") and v.Parent and v.Parent.Name == "Seek_Arm" then
+                v.CanTouch = not state
+            elseif v.Name == "DropCeiling" then
+                local hp = v:FindFirstChild("HurtPart")
+                if hp then hp.CanTouch = not state end
+            end
+        end
+        if not state then return end
+        antiSeekConn = workspace.CurrentRooms.DescendantAdded:Connect(function(v)
+            if v.Name == "ChandelierObstruction" then
+                local hp = v:WaitForChild("HurtPart", 5)
+                if hp then hp.CanTouch = false end
+            elseif v.Name == "Seek_Arm" then
+                local ap = v:WaitForChild("AnimatorPart", 5)
+                if ap then ap.CanTouch = false end
+            elseif v.Name == "HurtPart" and v.Parent and v.Parent.Name == "ChandelierObstruction" then
+                v.CanTouch = false
+            elseif v.Name == "AnimatorPart" and v.Parent and v.Parent.Name == "Seek_Arm" then
+                v.CanTouch = false
+            end
+        end)
+    end)
+end
+
+-- ── ANTI-SNARE (LX exact) ────────────────────────────────────
+local antiSnareConn = nil
+local function setupAntiSnare(state)
+    if antiSnareConn then antiSnareConn:Disconnect(); antiSnareConn = nil end
+    pcall(function()
+        for _, v in workspace.CurrentRooms:GetDescendants() do
+            if v.Name == "Snare" and v:FindFirstChild("Hitbox") then
+                v.Hitbox.CanTouch = not state
+            end
+        end
+        if not state then return end
+        antiSnareConn = workspace.CurrentRooms.DescendantAdded:Connect(function(v)
+            if v.Name == "Snare" then
+                local hb = v:WaitForChild("Hitbox", 5)
+                if hb then hb.CanTouch = false end
+            elseif v.Name == "Hitbox" and v.Parent and v.Parent.Name == "Snare" then
+                v.CanTouch = false
+            end
+        end)
+    end)
+end
+
+-- ── ANTI-GIGGLE (LX exact) ───────────────────────────────────
+local antiGiggleConn = nil
+local function setupAntiGiggle(state)
+    if antiGiggleConn then antiGiggleConn:Disconnect(); antiGiggleConn = nil end
+    pcall(function()
+        for _, room in workspace.CurrentRooms:GetChildren() do
+            for _, v in room:GetChildren() do
+                if v:IsA("Model") and v.Name == "GiggleCeiling" then
+                    local hb = v:FindFirstChild("Hitbox")
+                    if hb then hb.CanTouch = not state end
+                end
+            end
+        end
+        if not state then return end
+        antiGiggleConn = workspace.CurrentRooms.DescendantAdded:Connect(function(v)
+            if v.Name == "GiggleCeiling" and v:IsA("Model") then
+                local hb = v:WaitForChild("Hitbox", 5)
+                if hb then hb.CanTouch = false end
+            elseif v.Name == "Hitbox" and v.Parent and v.Parent.Name == "GiggleCeiling" then
+                v.CanTouch = false
+            end
+        end)
+    end)
+end
+
+-- ── ANTI-GLOOM EGG (LX exact) ────────────────────────────────
+local antiGloomEggConn = nil
+local function setupAntiGloomEgg(state)
+    if antiGloomEggConn then antiGloomEggConn:Disconnect(); antiGloomEggConn = nil end
+    pcall(function()
+        for _, v in workspace.CurrentRooms:GetDescendants() do
+            if v.Name == "GloomEgg" and v:IsA("Model") then
+                local egg = v:FindFirstChild("Egg")
+                if egg then egg.CanTouch = not state end
+            end
+        end
+        if not state then return end
+        antiGloomEggConn = workspace.CurrentRooms.DescendantAdded:Connect(function(v)
+            if v.Name == "GloomEgg" and v:IsA("Model") then
+                local egg = v:WaitForChild("Egg", 5)
+                if egg then egg.CanTouch = false end
+            elseif v.Name == "Egg" and v.Parent and v.Parent.Name == "GloomEgg" then
+                v.CanTouch = false
+            end
+        end)
+    end)
+end
+
+-- ── AVOID ENTITIES ───────────────────────────────────────────
+local function resolveEntityPart(entity)
+    if entity:IsA("BasePart") then return entity end
+    if entity:IsA("Model") and entity.PrimaryPart then return entity.PrimaryPart end
+    return entity:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function setAvoid(state)
+    local char      = player.Character
+    if not char then return end
+    local hum       = char:FindFirstChildOfClass("Humanoid")
+    local collision = char:FindFirstChild("Collision")
+    if not (hum and collision) then return end
+    avoidActive = state
+    if state then
+        safeFireServer("Crouch", true)
+        collision.Size = Vector3.new(1, 0.001, 3)
+        hum.HipHeight  = 0.0001
+    else
+        safeFireServer("Crouch", false)
+        collision.Size = Vector3.new(5.5, 3, 5)
+        hum.HipHeight  = 2.4
+    end
+end
+
+local lastAvoidCheck = 0
+local function updateAvoid(now)
+    if now - lastAvoidCheck < 0.1 then return end
+    lastAvoidCheck = now
+    if not avoidEnabled then
+        if avoidActive then pcall(setAvoid, false) end
+        return
+    end
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local toRemove, near = {}, false
+    for entity, part in pairs(activeEntities) do
+        if not (entity and entity.Parent and part and part.Parent) then
+            toRemove[entity] = true
+        else
+            if not near then
+                local name = entity.Name:lower()
+                if name == "rushmoving" or name == "ambushmoving" or
+                   name:find("ambush")  or name == "blitz" or
+                   name:find("backdoor") or name:find("a60") then
+                    local ok, d = pcall(function() return (root.Position - part.Position).Magnitude end)
+                    if ok and d < 250 then near = true end
+                end
+            end
+        end
+    end
+    for e in pairs(toRemove) do activeEntities[e] = nil end
+    if near and not avoidActive then pcall(setAvoid, true)
+    elseif not near and avoidActive then pcall(setAvoid, false) end  -- FIXED: was undefined 'shouldBeActive'
+end
+
+-- ── FULLBRIGHT ───────────────────────────────────────────────
+local fullbrightSave = nil
+local function applyFullbright()
+    if fullbrightSave then return end
+    fullbrightSave = {
+        Ambient = Lighting.Ambient,
+        OutdoorAmbient = Lighting.OutdoorAmbient,
+        Brightness = Lighting.Brightness,
+        FogEnd = Lighting.FogEnd,
+        FogStart = Lighting.FogStart,
+        GlobalShadows = Lighting.GlobalShadows,
+        ShadowSoftness = Lighting.ShadowSoftness,
+        EnvironmentDiffuse = Lighting.EnvironmentDiffuseScale,
+        EnvironmentSpecular = Lighting.EnvironmentSpecularScale,
+        effects = {}
+    }
+    -- Save all post-processing effects
+    for _, eff in ipairs(Lighting:GetChildren()) do
+        pcall(function()
+            if eff:IsA("ColorCorrectionEffect") then
+                fullbrightSave.effects[eff] = {
+                    type = "cc",
+                    Enabled = eff.Enabled,
+                    Brightness = eff.Brightness,
+                    Contrast = eff.Contrast,
+                    Saturation = eff.Saturation,
+                    TintColor = eff.TintColor
+                }
+                eff.Enabled = false
+            elseif eff:IsA("BloomEffect") or eff:IsA("BlurEffect") or eff:IsA("SunRaysEffect") or eff:IsA("DepthOfFieldEffect") then
+                fullbrightSave.effects[eff] = {
+                    type = "pe",
+                    Enabled = eff.Enabled
+                }
+                eff.Enabled = false
+            elseif eff:IsA("Atmosphere") then
+                fullbrightSave.effects[eff] = {
+                    type = "atm",
+                    Density = eff.Density,
+                    Offset = eff.Offset,
+                    Haze = eff.Haze,
+                    Glare = eff.Glare
+                }
+                eff.Density = 0
+                eff.Offset = 0
+                eff.Haze = 0
+                eff.Glare = 0
+            end
+        end)
+    end
+    Lighting.Ambient = Color3.new(1, 1, 1)
+    Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+    Lighting.Brightness = 5
+    Lighting.FogEnd = 1e9
+    Lighting.FogStart = 1e9
+    Lighting.GlobalShadows = false
+    Lighting.ShadowSoftness = 0
+    Lighting.EnvironmentDiffuseScale = 1
+    Lighting.EnvironmentSpecularScale = 1
+end
+
+local function restoreFullbright()
+    if not fullbrightSave then return end
+    Lighting.Ambient = fullbrightSave.Ambient
+    Lighting.OutdoorAmbient = fullbrightSave.OutdoorAmbient
+    Lighting.Brightness = fullbrightSave.Brightness
+    Lighting.FogEnd = fullbrightSave.FogEnd
+    Lighting.FogStart = fullbrightSave.FogStart
+    Lighting.GlobalShadows = fullbrightSave.GlobalShadows
+    Lighting.ShadowSoftness = fullbrightSave.ShadowSoftness
+    Lighting.EnvironmentDiffuseScale = fullbrightSave.EnvironmentDiffuse
+    Lighting.EnvironmentSpecularScale = fullbrightSave.EnvironmentSpecular
+    for eff, s in pairs(fullbrightSave.effects) do
+        pcall(function()
+            if s.type == "cc" then
+                eff.Enabled = s.Enabled
+                eff.Brightness = s.Brightness
+                eff.Contrast = s.Contrast
+                eff.Saturation = s.Saturation
+                eff.TintColor = s.TintColor
+            elseif s.type == "pe" then
+                eff.Enabled = s.Enabled
+            elseif s.type == "atm" then
+                eff.Density = s.Density
+                eff.Offset = s.Offset
+                eff.Haze = s.Haze
+                eff.Glare = s.Glare
+            end
+        end)
+    end
+    fullbrightSave = nil
+end
+
+-- Fight Doors lighting resets
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if not isFullbrightActive then continue end
+        pcall(function()
+            if Lighting.Ambient ~= Color3.new(1,1,1) then Lighting.Ambient = Color3.new(1,1,1) end
+            if Lighting.OutdoorAmbient ~= Color3.new(1,1,1) then Lighting.OutdoorAmbient = Color3.new(1,1,1) end
+            if Lighting.GlobalShadows ~= false then Lighting.GlobalShadows = false end
+            for _, eff in Lighting:GetChildren() do
+                pcall(function()
+                    if eff:IsA("ColorCorrectionEffect") and eff.Enabled then eff.Enabled = false end
+                    if eff:IsA("Atmosphere") and eff.Density ~= 0 then eff.Density = 0 end
+                end)
+            end
+        end)
+    end
+end)
+
+-- ── VIGNETTE / AMBIENCE ──────────────────────────────────────
+local function updateVignette()
+    pcall(function()
+        local v = player.PlayerGui.MainUI.MainFrame:FindFirstChild("HideVignette")
+        if v then v.Size = isNoVignetteActive and UDim2.new(0,0,0,0) or UDim2.new(1,0,1,0) end
+    end)
+end
+local function updateAmbience()
+    pcall(function()
+        local vol = isNoAmbienceActive and {Dark=0, Mines=0, Hotel=0, Hotel2=0, Hotel3=0}
+            or {Dark=0.6, Mines=0.4, Hotel=0.2, Hotel2=0.3, Hotel3=0.05}
+        local ws = workspace
+        if ws:FindFirstChild("Ambience_Dark")   then ws.Ambience_Dark.Volume   = vol.Dark   end
+        if ws:FindFirstChild("AmbienceMines")   then ws.AmbienceMines.Volume   = vol.Mines  end
+        if ws:FindFirstChild("Ambience_Hotel")  then ws.Ambience_Hotel.Volume  = vol.Hotel  end
+        if ws:FindFirstChild("Ambience_Hotel2") then ws.Ambience_Hotel2.Volume = vol.Hotel2 end
+        if ws:FindFirstChild("Ambience_Hotel3") then ws.Ambience_Hotel3.Volume = vol.Hotel3 end
+    end)
+end
+
+-- ── LX DOOR ESP ──────────────────────────────────────────────
+local function removeDoorESP()
+    for _, obj in ipairs(doorEspCache) do pcall(function() obj:Destroy() end) end
+    doorEspCache = {}
+end
+
+local function updateDoorESP()
+    removeDoorESP()
+    if not isDoorEspActive then return end
+    pcall(function()
+        local latestRoom = ReplicatedStorage.GameData.LatestRoom.Value
+        for i = latestRoom, latestRoom + 2 do
+            local room = workspace.CurrentRooms:FindFirstChild(tostring(i))
+            if room then
+                local door = room:FindFirstChild("Door")
+                if door and door:FindFirstChild("Door") then
+                    local target = door.Door
+                    local doorNumber = i + 1
+                    if ReplicatedStorage.GameData.Floor.Value == "Mines" then doorNumber = doorNumber + 100 end
+                    
+                    local opened = door:GetAttribute("Opened")
+                    local locked = room:GetAttribute("RequiresKey")
+                    local status = opened and "[Opened]" or (locked and "[Locked]" or "")
+                    local color = opened and Color3.new(0.4, 1, 0.4) or (locked and Color3.new(1, 0.4, 0.4) or Color3.new(1, 1, 0.4))
+                    
+                    local hl = Instance.new("Highlight", target); hl.Name = "LX_HL"
+                    hl.FillColor = color; hl.OutlineColor = Color3.new(1, 1, 1); hl.FillTransparency = 0.5
+                    table.insert(doorEspCache, hl)
+                    
+                    local bb = Instance.new("BillboardGui", target); bb.Name = "LX_BB"
+                    bb.Size = UDim2.new(0, 200, 0, 50); bb.AlwaysOnTop = true; bb.ExtentsOffset = Vector3.new(0, 3, 0)
+                    table.insert(doorEspCache, bb)
+                    
+                    local tl = Instance.new("TextLabel", bb); tl.Size = UDim2.new(1, 0, 1, 0); tl.BackgroundTransparency = 1
+                    tl.TextColor3 = color; tl.Font = Enum.Font.GothamBold; tl.TextSize = 14; tl.TextStrokeTransparency = 0
+                    
+                    task.spawn(function()
+                        while bb and bb.Parent and isDoorEspActive do
+                            local char = player.Character; local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                            if hrp then
+                                local dist = math.floor((hrp.Position - target.Position).Magnitude)
+                                tl.Text = string.format("Door %d %s\n%d studs", doorNumber, status, dist)
+                            end
+                            task.wait(0.2)
+                        end
+                    end)
+                end
+            end
+        end
+    end)
+end
+
+-- ── ITEM ESP ─────────────────────────────────────────────────
+local itemEspCache = {}
+local function getItemESPTarget(v)
+    local p = v.Parent
+    if v:IsA("ProximityPrompt") and p and (p.Name=="GoldPile" or p.Name:find("Key") or p.Name:find("Book") or p.Name:find("Fuse") or p.Name:find("Handle")) then
+        return p, p.Name
+    end
+    return nil, nil
+end
+local function addItemESP(v)
+    if not isItemEspActive then return end
+    local target, name = getItemESPTarget(v)
+    if not target or itemEspCache[target] then return end
+    local color = Color3.fromRGB(255,230,60)
+    local hl = Instance.new("Highlight"); hl.Name = "ItemHighlight"
+    hl.FillColor = color; hl.OutlineColor = Color3.fromRGB(255,255,255); hl.FillTransparency = 0.45; hl.Parent = target
+    itemEspCache[target] = hl
+end
+local function removeItemESP(v)
+    local function clear(t) local hl = itemEspCache[t]; if hl then hl:Destroy(); itemEspCache[t] = nil end end
+    clear(v); local target,_ = getItemESPTarget(v); if target then clear(target) end
+end
+local function setupItemESP(state)
+    for _, hl in pairs(itemEspCache) do pcall(function() hl:Destroy() end) end; itemEspCache = {}
+    if not state then return end
+    pcall(function()
+        if workspace:FindFirstChild("CurrentRooms") then for _, v in workspace.CurrentRooms:GetDescendants() do addItemESP(v) end end
+        if workspace:FindFirstChild("Drops") then for _, v in workspace.Drops:GetDescendants() do addItemESP(v) end end
+    end)
+end
+pcall(function()
+    local cr = workspace:WaitForChild("CurrentRooms", 5)
+    if cr then cr.DescendantAdded:Connect(addItemESP); cr.DescendantRemoving:Connect(removeItemESP) end
+end)
+local function hookDrops(d) d.DescendantAdded:Connect(addItemESP); d.DescendantRemoving:Connect(removeItemESP) end
+local ed = workspace:FindFirstChild("Drops")
+if ed then hookDrops(ed) else workspace.ChildAdded:Connect(function(c) if c.Name == "Drops" then hookDrops(c) end end) end
+
+-- ── PLAYER ESP ───────────────────────────────────────────────
+local playerEspCache = {}
+local function addPlayerESP(char)
+    if not isPlayerEspActive or playerEspCache[char] then return end
+    local hl = Instance.new("Highlight"); hl.Name = "PlayerHighlight"
+    hl.FillColor = Color3.fromRGB(0,220,255); hl.OutlineColor = Color3.fromRGB(255,255,255); hl.FillTransparency = 0.4; hl.Parent = char
+    playerEspCache[char] = hl
+end
+local function removePlayerESP(char) local hl = playerEspCache[char]; if hl then hl:Destroy(); playerEspCache[char] = nil end end
+local function setupPlayerESP(state)
+    for _, hl in pairs(playerEspCache) do pcall(function() hl:Destroy() end) end; playerEspCache = {}
+    if not state then return end
+    for _, p in Players:GetPlayers() do if p ~= player and p.Character then addPlayerESP(p.Character) end end
+end
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function(char) if isPlayerEspActive then addPlayerESP(char) end end)
+end)
+for _, p in Players:GetPlayers() do
+    if p ~= player then
+        p.CharacterAdded:Connect(function(char) if isPlayerEspActive then addPlayerESP(char) end end)
+        p.CharacterRemoving:Connect(removePlayerESP)
+    end
+end
+Players.PlayerRemoving:Connect(function(p) if p.Character then removePlayerESP(p.Character) end end)
+
+-- ── ENTITY ESP ───────────────────────────────────────────────
+local entityDisplayNames = {
+    rushmoving="RUSH", ambushmoving="AMBUSH", eyes="EYES", screech="SCREECH",
+    halt="HALT", seekmoving="SEEK", figure="FIGURE", glitch="GLITCH",
+    a60="A-60", a90="A-90", a120="A-120", backdoorrush="BACKDOOR RUSH",
+    mandrake="MANDRAKE", blitz="BLITZ", haste="HASTE", vacuum="VACUUM",
+    giggle="GIGGLE", grumble="GRUMBLE", lookman="LOOKMAN",
+    rush="RUSH", ambush="AMBUSH", guidinglight="GUIDING LIGHT",
+    curiouslight="CURIOUS LIGHT", hide="HIDE", jack="JACK", timothy="TIMOTHY",
+    groundskeeper="GROUNDSKEEPER", monumententity="MONUMENT", lanternhead="LANTERNHEAD",
+}
+local entityColors = {
+    rushmoving=Color3.fromRGB(255,70,70), ambushmoving=Color3.fromRGB(255,140,30),
+    eyes=Color3.fromRGB(190,190,255), screech=Color3.fromRGB(255,50,200),
+    halt=Color3.fromRGB(160,100,255), seekmoving=Color3.fromRGB(60,220,100),
+    figure=Color3.fromRGB(255,60,60), glitch=Color3.fromRGB(0,230,230),
+    a60=Color3.fromRGB(255,200,50), a90=Color3.fromRGB(255,170,30),
+    a120=Color3.fromRGB(255,100,20), backdoorrush=Color3.fromRGB(255,80,80),
+    groundskeeper=Color3.fromRGB(120,255,120), monumententity=Color3.fromRGB(255,255,255),
+    blitz=Color3.fromRGB(100,180,255), haste=Color3.fromRGB(255,220,50),
+    vacuum=Color3.fromRGB(180,80,255), timothy=Color3.fromRGB(200,255,100),
+    hide=Color3.fromRGB(120,120,255), jack=Color3.fromRGB(255,160,60),
+    lanternhead=Color3.fromRGB(255,165,0), mandrake=Color3.fromRGB(150,255,120),
+    giggle=Color3.fromRGB(255,100,200), grumble=Color3.fromRGB(200,160,100),
+    lookman=Color3.fromRGB(255,255,120),
+}
+local function updateEntityESP()
+    local toRemove = {}
+    for entity, targetPart in pairs(activeEntities) do
+        if not (entity and entity.Parent and targetPart and targetPart.Parent) then
+            toRemove[entity] = true
+        else
+            local hl = entity:FindFirstChild("ESPHighlight")
+            local bb = entity:FindFirstChild("ESPLabel")
+            if isEspActive then
+                local lower = entity.Name:lower()
+                local color = entityColors[lower] or Color3.fromRGB(255,50,50)
+                local dname = entityDisplayNames[lower] or entity.Name:upper()
+                if not hl then
+                    hl = Instance.new("Highlight"); hl.Name = "ESPHighlight"
+                    hl.FillColor = color; hl.OutlineColor = Color3.fromRGB(255,200,200); hl.FillTransparency = 0.45; hl.Parent = entity
+                end
+                if not bb then
+                    bb = Instance.new("BillboardGui"); bb.Name = "ESPLabel"
+                    bb.Size = UDim2.new(0,100,0,20); bb.AlwaysOnTop = true; bb.ExtentsOffset = Vector3.new(0,3,0); bb.Parent = entity
+                    local tl = Instance.new("TextLabel", bb); tl.Size = UDim2.new(1,0,1,0); tl.BackgroundTransparency = 1
+                    tl.Text = dname; tl.TextColor3 = color; tl.Font = Enum.Font.GothamBold; tl.TextSize = 16; tl.TextStrokeTransparency = 0
+                end
+            else
+                if hl then hl:Destroy() end; if bb then bb:Destroy() end
+            end
+        end
+    end
+    for e in pairs(toRemove) do activeEntities[e] = nil end
+end
+
+-- ── AUTO PLAY (PathfindNodes navigation — LX Doors method) ──
+local isAutoPlayActive      = false
+local autoPlayCurrentNode   = 1
+local autoPlayNodes         = {}  -- sorted list of Vector3 positions
+local autoPlayLastPos       = Vector3.new()
+local autoPlayStuckTimer    = 0
+
+-- Intercept PathfindNodes:Destroy() so nodes persist when Rush spawns
+local _lxNamecall
+pcall(function()
+    _lxNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "FireServer" then
+            if self.Name == "ClutchHeartbeat" and isAutoHeartbeatActive then return end
+            if self.Name == "Screech" and isAntiScreechActive then
+                local args = {...}
+                if not args[1] then args[1] = true end
+                return _lxNamecall(self, unpack(args))
+            end
+        end
+        return _lxNamecall(self, ...)
+    end))
+end)
+
+-- ── NOTIFICATION SYSTEM ──────────────────────────────────────
+local notifQueue = {}
+local NOTIF_W, NOTIF_H, NOTIF_PAD, NOTIF_X, NOTIF_Y = 230, 52, 8, 12, 80
+local function repositionNotifs()
+    for i, data in ipairs(notifQueue) do
+        local ty = NOTIF_Y + (i-1)*(NOTIF_H + NOTIF_PAD)
+        TweenService:Create(data.frame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(1, -NOTIF_W - NOTIF_X, 0, ty)}):Play()
+    end
+end
+local showEntityNotification  -- forward declare
+
+-- ============================================================
+--  GUI
+-- ============================================================
+local old = CoreGui:FindFirstChild("GodmodeGui"); if old then old:Destroy() end
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "GodmodeGui"; screenGui.ResetOnSpawn = false; screenGui.IgnoreGuiInset = true
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; screenGui.Parent = CoreGui
+
+showEntityNotification = function(rawName)
+    task.spawn(function()
+        pcall(function()
+            local lower = rawName:lower()
+            local dname = entityDisplayNames[lower] or rawName:upper()
+            local color = entityColors[lower] or Color3.fromRGB(255,200,50)
+            local slot = #notifQueue + 1; local sy = NOTIF_Y + (slot-1)*(NOTIF_H + NOTIF_PAD)
+            local frame = Instance.new("Frame"); frame.Size = UDim2.new(0, NOTIF_W, 0, NOTIF_H)
+            frame.Position = UDim2.new(1, NOTIF_X, 0, sy); frame.BackgroundColor3 = Color3.fromRGB(14,14,20)
+            frame.BorderSizePixel = 0; frame.ZIndex = 20; frame.Parent = screenGui
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0,8)
+            local st = Instance.new("UIStroke", frame); st.Color = color; st.Thickness = 1; st.Transparency = 0.5
+            local bar = Instance.new("Frame", frame); bar.Size = UDim2.new(0,3,1,-10); bar.Position = UDim2.new(0,0,0,5)
+            bar.BackgroundColor3 = color; bar.BorderSizePixel = 0; Instance.new("UICorner", bar).CornerRadius = UDim.new(0,2)
+            local nl = Instance.new("TextLabel", frame); nl.Size = UDim2.new(1,-18,0,22); nl.Position = UDim2.new(0,12,0,6)
+            nl.BackgroundTransparency = 1; nl.Text = "⚠  "..dname; nl.TextColor3 = color
+            nl.Font = Enum.Font.GothamBold; nl.TextSize = 13; nl.TextXAlignment = Enum.TextXAlignment.Left; nl.ZIndex = 21
+            local sl = Instance.new("TextLabel", frame); sl.Size = UDim2.new(1,-18,0,16); sl.Position = UDim2.new(0,12,0,30)
+            sl.BackgroundTransparency = 1; sl.Text = "Entity detected!"; sl.TextColor3 = Color3.fromRGB(160,160,185)
+            sl.Font = Enum.Font.Gotham; sl.TextSize = 11; sl.TextXAlignment = Enum.TextXAlignment.Left; sl.ZIndex = 21
+            local entry = {frame = frame}; table.insert(notifQueue, entry)
+            TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(1, -(NOTIF_W + NOTIF_X), 0, sy)}):Play()
+            task.delay(3, function()
+                TweenService:Create(frame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(1, NOTIF_X, 0, frame.Position.Y.Offset)}):Play()
+                task.wait(0.28); frame:Destroy()
+                for i, e in ipairs(notifQueue) do if e == entry then table.remove(notifQueue, i); break end end
+                repositionNotifs()
+            end)
+        end)
+    end)
+end
+
+-- ── UI HELPERS ───────────────────────────────────────────────
+local C = {
+    bg = Color3.fromRGB(10,10,14), panel = Color3.fromRGB(16,16,22),
+    surface = Color3.fromRGB(22,22,32), border = Color3.fromRGB(38,38,55),
+    accent = Color3.fromRGB(88,130,255), accentDim = Color3.fromRGB(55,80,180),
+    green = Color3.fromRGB(52,210,110), red = Color3.fromRGB(220,65,65),
+    text = Color3.new(1,1,1), textDim = Color3.fromRGB(160,160,185), textMute = Color3.fromRGB(90,90,115),
+}
+local function tw(obj, props, t, style, dir)
+    TweenService:Create(obj, TweenInfo.new(t or 0.2, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out), props):Play()
+end
+local function ripple(btn)
+    local r = Instance.new("Frame"); r.Size = UDim2.new(0,0,0,0); r.AnchorPoint = Vector2.new(0.5,0.5)
+    r.Position = UDim2.new(0.5,0,0.5,0); r.BackgroundColor3 = Color3.new(1,1,1); r.BackgroundTransparency = 0.75
+    r.BorderSizePixel = 0; r.ZIndex = btn.ZIndex+1; r.Parent = btn
+    Instance.new("UICorner", r).CornerRadius = UDim.new(1,0)
+    tw(r, {Size = UDim2.new(0,80,0,80), BackgroundTransparency = 1}, 0.45); Debris:AddItem(r, 0.5)
+end
+local function corner(obj, r) Instance.new("UICorner", obj).CornerRadius = UDim.new(0, r or 8) end
+local function makeDraggable(handle, target)
+    local drag, di, mp, fp = false, nil, nil, nil
+    handle.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            drag = true; mp = i.Position; fp = target.Position
+            i.Changed:Connect(function() if i.UserInputState == Enum.UserInputState.End then drag = false end end)
+        end
+    end)
+    handle.InputChanged:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then di = i end
+    end)
+    UIS.InputChanged:Connect(function(i)
+        if i == di and drag then
+            local d = i.Position - mp
+            target.Position = UDim2.new(fp.X.Scale, fp.X.Offset + d.X, fp.Y.Scale, fp.Y.Offset + d.Y)
+        end
+    end)
+end
+
+-- ── WINDOW ───────────────────────────────────────────────────
+local mainWindow = Instance.new("Frame")
+mainWindow.Name = "MainWindow"; mainWindow.Size = UDim2.new(0,320,0,530)
+mainWindow.Position = UDim2.new(0,20,0.5,-265); mainWindow.BackgroundColor3 = C.bg
+mainWindow.BorderSizePixel = 0; mainWindow.Parent = screenGui; mainWindow.Visible = false; corner(mainWindow,12)
+local bs = Instance.new("UIStroke", mainWindow); bs.Color = C.border; bs.Thickness = 1; bs.Transparency = 0.3
+local titleBar = Instance.new("Frame"); titleBar.Size = UDim2.new(1,0,0,44); titleBar.BackgroundColor3 = C.panel
+titleBar.BorderSizePixel = 0; titleBar.Parent = mainWindow; corner(titleBar,12)
+do local f = Instance.new("Frame", titleBar); f.Size = UDim2.new(1,0,0,12); f.Position = UDim2.new(0,0,1,-12); f.BackgroundColor3 = C.panel; f.BorderSizePixel = 0 end
+local al = Instance.new("Frame"); al.Size = UDim2.new(1,0,0,2); al.Position = UDim2.new(0,0,1,-2); al.BackgroundColor3 = C.accent; al.BorderSizePixel = 0; al.Parent = titleBar
+Instance.new("UIGradient", al).Color = ColorSequence.new({ColorSequenceKeypoint.new(0, C.accentDim), ColorSequenceKeypoint.new(0.5, C.accent), ColorSequenceKeypoint.new(1, C.accentDim)})
+local df = Instance.new("Frame"); df.Size = UDim2.new(0,52,0,12); df.Position = UDim2.new(0,10,0.5,-6); df.BackgroundTransparency = 1; df.Parent = titleBar
+for i, col in ipairs({Color3.fromRGB(255,90,90), Color3.fromRGB(255,200,50), Color3.fromRGB(50,215,90)}) do
+    local d = Instance.new("Frame"); d.Size = UDim2.new(0,10,0,10); d.Position = UDim2.new(0,(i-1)*16,0,0); d.BackgroundColor3 = col; d.BorderSizePixel = 0; d.Parent = df; corner(d,5)
+end
+local tl2 = Instance.new("TextLabel"); tl2.Size = UDim2.new(1,-70,1,0); tl2.Position = UDim2.new(0,70,0,0)
+tl2.BackgroundTransparency = 1; tl2.Text = "FUNNY HUB  V3"; tl2.TextColor3 = C.text; tl2.Font = Enum.Font.GothamBold; tl2.TextSize = 13; tl2.TextXAlignment = Enum.TextXAlignment.Left; tl2.Parent = titleBar
+local rb = Instance.new("Frame"); rb.Size = UDim2.new(0,90,0,20); rb.Position = UDim2.new(1,-98,0.5,-10); rb.BackgroundColor3 = C.surface; rb.BorderSizePixel = 0; rb.Parent = titleBar; corner(rb,5)
+local rbt = Instance.new("TextLabel"); rbt.Size = UDim2.new(1,0,1,0); rbt.BackgroundTransparency = 1; rbt.Text = "RM 0"; rbt.TextColor3 = C.accent; rbt.Font = Enum.Font.GothamBold; rbt.TextSize = 11; rbt.Parent = rb
+pcall(function()
+    rbt.Text = "RM "..ReplicatedStorage.GameData.LatestRoom.Value
+    ReplicatedStorage.GameData.LatestRoom:GetPropertyChangedSignal("Value"):Connect(function()
+        rbt.Text = "RM "..ReplicatedStorage.GameData.LatestRoom.Value
+        if isDoorEspActive then updateDoorESP() end
+    end)
+end)
+makeDraggable(titleBar, mainWindow)
+local TAB_H = 36
+local tabBar = Instance.new("Frame"); tabBar.Size = UDim2.new(1,0,0,TAB_H); tabBar.Position = UDim2.new(0,0,0,44)
+tabBar.BackgroundColor3 = C.panel; tabBar.BorderSizePixel = 0; tabBar.Parent = mainWindow
+do local f = Instance.new("Frame", tabBar); f.Size = UDim2.new(1,0,0,6); f.BackgroundColor3 = C.panel; f.BorderSizePixel = 0 end
+local tabInd = Instance.new("Frame"); tabInd.Size = UDim2.new(0,54,0,2); tabInd.Position = UDim2.new(0,6,1,-2)
+tabInd.BackgroundColor3 = C.accent; tabInd.BorderSizePixel = 0; tabInd.Parent = tabBar; corner(tabInd,1)
+local ca = Instance.new("Frame"); ca.Size = UDim2.new(1,0,1,-(44+TAB_H+8)); ca.Position = UDim2.new(0,0,0,44+TAB_H+4)
+ca.BackgroundTransparency = 1; ca.Parent = mainWindow; ca.ClipsDescendants = true
+
+local function makeScroller()
+    local sf = Instance.new("ScrollingFrame"); sf.Size = UDim2.new(1,0,1,0); sf.BackgroundTransparency = 1; sf.BorderSizePixel = 0
+    sf.ScrollBarThickness = 3; sf.ScrollBarImageColor3 = C.accent; sf.CanvasSize = UDim2.new(0,0,0,0); sf.Visible = false; sf.Parent = ca
+    local lay = Instance.new("UIListLayout", sf); lay.Padding = UDim.new(0,6); lay.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    local pad = Instance.new("UIPadding", sf); pad.PaddingTop = UDim.new(0,8); pad.PaddingBottom = UDim.new(0,8)
+    lay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() sf.CanvasSize = UDim2.new(0,0,0,lay.AbsoluteContentSize.Y+16) end)
+    return sf
+end
+local function addHeader(parent, text)
+    local row = Instance.new("Frame"); row.Size = UDim2.new(0,288,0,22); row.BackgroundTransparency = 1; row.Parent = parent
+    local b = Instance.new("Frame", row); b.Size = UDim2.new(0,2,0,14); b.Position = UDim2.new(0,4,0.5,-7); b.BackgroundColor3 = C.accent; b.BorderSizePixel = 0
+    local l = Instance.new("TextLabel", row); l.Size = UDim2.new(1,-14,1,0); l.Position = UDim2.new(0,12,0,0); l.BackgroundTransparency = 1
+    l.Text = text; l.TextColor3 = C.textMute; l.Font = Enum.Font.GothamBold; l.TextSize = 10; l.TextXAlignment = Enum.TextXAlignment.Left
+end
+local function makeToggle(parent, label, onToggle)
+    local btn = Instance.new("TextButton"); btn.Size = UDim2.new(0,288,0,42); btn.BackgroundColor3 = C.surface
+    btn.BorderSizePixel = 0; btn.Text = ""; btn.AutoButtonColor = false; btn.Parent = parent; corner(btn,8)
+    local sk = Instance.new("UIStroke", btn); sk.Color = C.border; sk.Thickness = 1
+    local lbl = Instance.new("TextLabel", btn); lbl.Size = UDim2.new(1,-60,1,0); lbl.Position = UDim2.new(0,12,0,0)
+    lbl.BackgroundTransparency = 1; lbl.Text = label; lbl.TextColor3 = C.text; lbl.Font = Enum.Font.GothamSemibold; lbl.TextSize = 13; lbl.TextXAlignment = Enum.TextXAlignment.Left
+    local pill = Instance.new("Frame", btn); pill.Size = UDim2.new(0,40,0,22); pill.Position = UDim2.new(1,-52,0.5,-11); pill.BackgroundColor3 = C.border; pill.BorderSizePixel = 0; corner(pill,11)
+    local knob = Instance.new("Frame", pill); knob.Size = UDim2.new(0,16,0,16); knob.Position = UDim2.new(0,3,0.5,-8); knob.BackgroundColor3 = C.textMute; knob.BorderSizePixel = 0; corner(knob,8)
+    local state = false
+    local function setState(v)
+        state = v; tw(pill, {BackgroundColor3 = v and C.green or C.border}, 0.18)
+        tw(knob, {Position = v and UDim2.new(0,21,0.5,-8) or UDim2.new(0,3,0.5,-8), BackgroundColor3 = v and Color3.new(1,1,1) or C.textMute}, 0.18)
+        sk.Color = v and C.green or C.border
+    end
+    btn.MouseButton1Click:Connect(function() ripple(btn); state = not state; setState(state); if onToggle then onToggle(state) end end)
+    btn.MouseEnter:Connect(function() tw(btn, {BackgroundColor3 = Color3.fromRGB(28,28,40)}, 0.12) end)
+    btn.MouseLeave:Connect(function() tw(btn, {BackgroundColor3 = C.surface}, 0.12) end)
+    return btn, setState
+end
+local function makeActionButton(parent, label, onClick)
+    local btn = Instance.new("TextButton"); btn.Size = UDim2.new(0,288,0,38); btn.BackgroundColor3 = C.accentDim
+    btn.BorderSizePixel = 0; btn.Text = label; btn.TextColor3 = C.text; btn.Font = Enum.Font.GothamBold; btn.TextSize = 13
+    btn.AutoButtonColor = false; btn.ClipsDescendants = true; btn.Parent = parent; corner(btn,8)
+    btn.MouseButton1Click:Connect(function() ripple(btn); if onClick then onClick() end end)
+    btn.MouseEnter:Connect(function() tw(btn, {BackgroundColor3 = C.accent}, 0.12) end)
+    btn.MouseLeave:Connect(function() tw(btn, {BackgroundColor3 = C.accentDim}, 0.12) end)
+    return btn
+end
+local function makeInputRow(parent, label, default, onChanged)
+    local row = Instance.new("Frame"); row.Size = UDim2.new(0,288,0,38); row.BackgroundColor3 = C.surface; row.BorderSizePixel = 0; row.Parent = parent; corner(row,8)
+    local lbl = Instance.new("TextLabel", row); lbl.Size = UDim2.new(0.6,0,1,0); lbl.Position = UDim2.new(0,12,0,0); lbl.BackgroundTransparency = 1
+    lbl.Text = label; lbl.TextColor3 = C.textDim; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 13; lbl.TextXAlignment = Enum.TextXAlignment.Left
+    local box = Instance.new("TextBox", row); box.Size = UDim2.new(0,80,0,26); box.Position = UDim2.new(1,-88,0.5,-13)
+    box.BackgroundColor3 = C.bg; box.TextColor3 = C.text; box.Text = tostring(default); box.Font = Enum.Font.GothamBold; box.TextSize = 13; box.BorderSizePixel = 0; corner(box,6)
+    box.FocusLost:Connect(function() local v = tonumber(box.Text); if v and onChanged then onChanged(v) end; if not v then box.Text = tostring(default) end end)
+    return row, box
+end
+
+-- ── TABS ─────────────────────────────────────────────────────
+local TABS = {"MAIN", "ENTITY", "VISUALS", "SHOP", "SETTINGS"}
+local tabPages, tabBtns = {}, {}
+for i, name in ipairs(TABS) do
+    tabPages[i] = makeScroller()
+    local bw = math.floor(314/#TABS)
+    local tb = Instance.new("TextButton"); tb.Size = UDim2.new(0,bw,0,TAB_H-2); tb.Position = UDim2.new(0,3+(i-1)*bw,0,1)
+    tb.BackgroundTransparency = 1; tb.Text = name; tb.TextColor3 = (i==1) and C.text or C.textMute
+    tb.Font = Enum.Font.GothamBold; tb.TextSize = 10; tb.BorderSizePixel = 0; tb.Parent = tabBar; tabBtns[i] = tb
+    tb.MouseButton1Click:Connect(function()
+        for j, pg in ipairs(tabPages) do pg.Visible = (j==i); tabBtns[j].TextColor3 = (j==i) and C.text or C.textMute end
+        tw(tabInd, {Position = UDim2.new(0,3+(i-1)*bw+2,1,-2), Size = UDim2.new(0,bw-4,0,2)}, 0.2)
+    end)
+end
+tabPages[1].Visible = true
+
+-- ─────────────────────────────────────────────────────────────
+--  TAB 1: MAIN
+-- ─────────────────────────────────────────────────────────────
+local p1 = tabPages[1]
+addHeader(p1, "MOVEMENT & CORE")
+makeToggle(p1, "Auto Anti-Rush / Ambush (Avoid)", function(v) avoidEnabled = v end)
+makeToggle(p1, "NoClip", function(v) isNoClipActive = v end)
+makeToggle(p1, "Insta-Interact", function(v) isInstaInteractActive = v; setupInstaInteract(v) end)
+makeToggle(p1, "Auto Crouch", function(v) isAutoCrouchActive = v end)
+local _, setNoAnimToggle = makeToggle(p1, "No Movement Anim", function(v)
+    isNoAnimActive = v; pcall(function() local mg = getMainGame(); if mg then mg.disableMovement = v end end)
+end)
+addHeader(p1, "AUTOMATION")
+makeToggle(p1, "Auto-Solve Library", function(v) isAutoLibraryActive = v end)
+makeToggle(p1, "Auto Heartbeat", function(v) isAutoHeartbeatActive = v end)
+makeToggle(p1, "Auto Loot Aura", function(v)
+    isLootAuraActive = v
+    if not v then objectsenabled = {}; lastRoomObjects = {}; roomLastTime = -1
+        if lootRoomConn then lootRoomConn:Disconnect(); lootRoomConn = nil end end
+end)
+makeToggle(p1, "Bring Items (Orbit)", function(v)
+    isBringing = v
+    if v then
+        task.spawn(function()
+            local lastKnown, currentTarget = {}, nil
+            local selHL = Instance.new("Highlight", screenGui); selHL.FillColor = Color3.new(1,1,1); selHL.OutlineColor = Color3.new(1,1,1); selHL.FillTransparency = 0.5
+            while isBringing do
+                local char = player.Character; local hrp = char and char:FindFirstChild("HumanoidRootPart"); local drops = workspace:FindFirstChild("Drops")
+                if hrp and drops then
+                    local children = drops:GetChildren(); local count = math.max(#children, 1); local t = tick()
+                    local mt = player:GetMouse().Target
+                    if mt then for _, drop in ipairs(children) do if mt:IsDescendantOf(drop) then currentTarget = drop; break end end end
+                    if currentTarget and not currentTarget:IsDescendantOf(drops) then currentTarget = nil end
+                    for i2, drop in ipairs(children) do
+                        if not lastKnown[drop] then lastKnown[drop] = t end
+                        local alive = t - lastKnown[drop]; local angle = (i2/count)*math.pi*2 + (t*orbitSpeed)
+                        local hover = math.sin(t*3 + (i2*0.5))*0.5; local bounce = (alive < 0.5) and math.sin(alive/0.5*math.pi)*2 or 0
+                        local rad = (drop == currentTarget) and orbitRadius*0.5 or orbitRadius; local vOff = (drop == currentTarget) and 0.6 or 1.5
+                        local off = Vector3.new(math.sin(angle)*rad, hover + vOff + bounce, math.cos(angle)*rad)
+                        local tCF = CFrame.lookAt(hrp.Position + off, hrp.Position)
+                        if drop:IsA("BasePart") then drop.Anchored = false; drop.CanCollide = false; drop.CFrame = tCF
+                        elseif drop:IsA("Model") then for _, pp in drop:GetDescendants() do if pp:IsA("BasePart") then pp.Anchored = false; pp.CanCollide = false end end; drop:PivotTo(tCF) end
+                    end
+                    selHL.Adornee = currentTarget
+                    for drop in pairs(lastKnown) do if not drop.Parent then lastKnown[drop] = nil end end
+                end
+                RunService.Heartbeat:Wait()
+            end
+            selHL:Destroy()
+        end)
+    end
+end)
+makeToggle(p1, "Spam Items", function(v)
+    isSpamming = v
+    if v then task.spawn(function()
+        while isSpamming do
+            pcall(function()
+                local bp = player:FindFirstChild("Backpack"); local char = player.Character
+                if bp and char and char:FindFirstChild("Humanoid") then
+                    for _, item in ipairs(bp:GetChildren()) do if item:IsA("Tool") then char.Humanoid:EquipTool(item); task.wait(0.1) end end
+                end
+            end)
+            task.wait(0.5)
+        end
+    end) end
+end)
+makeToggle(p1, "Inf Lockpick / Skeleton Key", function(v) isInfItemsActive = v end)
+
+-- ─────────────────────────────────────────────────────────────
+--  TAB 2: ENTITY
+-- ─────────────────────────────────────────────────────────────
+local p2 = tabPages[2]
+addHeader(p2, "PASSIVE DEFENSES")
+makeToggle(p2, "Anti-Screech", setAntiScreech)
+makeToggle(p2, "Anti-A90", function(v) isAntiA90Active = v; setAntiA90(v) end)
+makeToggle(p2, "Anti-Halt (Shade)", function(v) isAntiHaltActive = v; setAntiHalt(v) end)
+makeToggle(p2, "Anti-Dupe (Fake Doors)", function(v) isAntiDupeActive = v; setupAntiDupe(v) end)
+makeToggle(p2, "Anti-Seek Obstacles", function(v) isAntiSeekActive = v; setupAntiSeek(v) end)
+makeToggle(p2, "Anti-Snare", function(v) isAntiSnareActive = v; setupAntiSnare(v) end)
+makeToggle(p2, "Anti-Giggle (Mines)", function(v) isAntiGiggleActive = v; setupAntiGiggle(v) end)
+makeToggle(p2, "Anti-Gloom Egg (Mines)", function(v) isAntiGloomEggActive = v; setupAntiGloomEgg(v) end)
+makeToggle(p2, "Anti-Eyes", function(v) isAntiEyesActive = v end)
+makeToggle(p2, "Anti Surge", function(v) isAntiSurgeActive = v; if v then applyAntiSurge() end end)
+makeToggle(p2, "Auto Look Monuments", function(v) isAutoLookMonumentsActive = v end)
+makeToggle(p2, "Anti Groundkeeper", function(v) isAntiGroundskeeperActive = v end)
+
+addHeader(p2, "ACTIVE TRICKS")
+
+makeActionButton(p2, "Anti-Rush / Anti-Ambush (Mines F2)", function()
+    task.spawn(function()
+        pcall(function()
+            local ra = RemotesFolder and RemotesFolder:FindFirstChild("RequestAsset")
+            if not ra then
+                ra = ReplicatedStorage:FindFirstChild("RemotesFolder") and
+                     ReplicatedStorage.RemotesFolder:FindFirstChild("RequestAsset")
+            end
+            if not ra then return end
+            for i = 1, 11 do
+                task.spawn(function()
+                    pcall(function() ra:InvokeServer("Remote") end)
+                end)
+            end
+        end)
+    end)
+end)
+makeToggle(p2, "Trick Figure (Ride Figure)", function(v)
+    isTrickFigureActive = v
+    if not v then pcall(function()
+        local char = player.Character; local hum = char and char:FindFirstChildOfClass("Humanoid"); local col = char and char:FindFirstChild("Collision")
+        if hum and col then safeFireServer("Crouch", false); col.Size = Vector3.new(5.5,3,5); hum.HipHeight = 2.4 end
+    end) end
+end)
+
+-- ─────────────────────────────────────────────────────────────
+--  TAB 3: VISUALS
+-- ─────────────────────────────────────────────────────────────
+local p3 = tabPages[3]
+addHeader(p3, "ESP")
+makeToggle(p3, "Entity ESP", function(v) isEspActive = v; updateEntityESP() end)
+makeToggle(p3, "Item ESP", function(v) isItemEspActive = v; setupItemESP(v) end)
+makeToggle(p3, "LX Doors ESP", function(v) isDoorEspActive = v; updateDoorESP() end)
+makeToggle(p3, "Player ESP", function(v) isPlayerEspActive = v; setupPlayerESP(v) end)
+addHeader(p3, "ENVIRONMENT")
+makeToggle(p3, "Fullbright", function(v) isFullbrightActive = v; if v then applyFullbright() else restoreFullbright() end end)
+makeToggle(p3, "No Vignette", function(v) isNoVignetteActive = v; updateVignette() end)
+makeToggle(p3, "No Ambience Sounds", function(v) isNoAmbienceActive = v; updateAmbience() end)
+
+-- ─────────────────────────────────────────────────────────────
+--  TAB 4: SHOP
+-- ─────────────────────────────────────────────────────────────
+local p4 = tabPages[4]
+addHeader(p4, "PRE-RUN SHOP")
+local Amounts = {Lockpick=1, Vitamins=1, Flashlight=1, Bulklight=1, Straplight=1, Bandagepack=1, Lighter=1}
+for itemName, defaultAmt in pairs(Amounts) do
+    local row = Instance.new("Frame"); row.Size = UDim2.new(0,288,0,48); row.BackgroundColor3 = C.surface; row.BorderSizePixel = 0; row.Parent = p4; corner(row,8)
+    local lbl = Instance.new("TextLabel", row); lbl.Size = UDim2.new(0.5,0,1,0); lbl.Position = UDim2.new(0,12,0,0); lbl.BackgroundTransparency = 1; lbl.Text = itemName:upper(); lbl.TextColor3 = C.text; lbl.Font = Enum.Font.GothamBold; lbl.TextSize = 12; lbl.TextXAlignment = Enum.TextXAlignment.Left
+    local box = Instance.new("TextBox", row); box.Size = UDim2.new(0,52,0,28); box.Position = UDim2.new(1,-118,0.5,-14); box.BackgroundColor3 = C.bg; box.TextColor3 = C.text; box.Text = tostring(defaultAmt); box.Font = Enum.Font.GothamBold; box.TextSize = 13; box.BorderSizePixel = 0; corner(box,6)
+    box.FocusLost:Connect(function() Amounts[itemName] = tonumber(box.Text) or defaultAmt end)
+    local buyBtn = Instance.new("TextButton", row); buyBtn.Size = UDim2.new(0,52,0,28); buyBtn.Position = UDim2.new(1,-58,0.5,-14); buyBtn.BackgroundColor3 = C.accentDim; buyBtn.TextColor3 = C.text; buyBtn.Text = "BUY"; buyBtn.Font = Enum.Font.GothamBold; buyBtn.TextSize = 12; buyBtn.BorderSizePixel = 0; buyBtn.ClipsDescendants = true; corner(buyBtn,6)
+    buyBtn.MouseButton1Click:Connect(function()
+        ripple(buyBtn)
+        pcall(function()
+            local shop = ReplicatedStorage.RemotesFolder:WaitForChild("PreRunShop", 3); if not shop then return end
+            local items = {}; for i = 1, Amounts[itemName] do items[i] = itemName end; shop:FireServer(items)
+        end)
+    end)
+end
+
+-- ─────────────────────────────────────────────────────────────
+--  TAB 5: SETTINGS
+-- ─────────────────────────────────────────────────────────────
+local p5 = tabPages[5]
+addHeader(p5, "LX DOORS BYPASS")
+
+makeToggle(p5, "LX Speed Bypass (Massless)", function(v) isLXBypassActive = v end)
+
+makeToggle(p5, "Mines AC Bypass (Ladder)", function(v)
+    isMinesBypassActive = v
+    if not v then
+        if isMinesBypassed then safeFireServer("ClimbLadder"); isMinesBypassed = false end
+        if ladderHLConn then ladderHLConn:Disconnect(); ladderHLConn = nil end
+    end
+    local function hl(asset)
+        if asset.Name == "Ladder" and asset:IsA("Model") and not asset:FindFirstChild("LadderHL") then
+            local h = Instance.new("Highlight", asset)
+            h.Name = "LadderHL"; h.FillColor = Color3.fromRGB(0, 160, 255); h.FillTransparency = 0.5
+        end
+    end
+    if v then
+        for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
+            for _, asset in ipairs(room:GetDescendants()) do hl(asset) end
+        end
+        ladderHLConn = workspace.CurrentRooms.DescendantAdded:Connect(hl)
+    else
+        for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
+            for _, asset in ipairs(room:GetDescendants()) do
+                local h = asset:FindFirstChild("LadderHL")
+                if h then h:Destroy() end
+            end
+        end
+    end
+end)
+
+makeInputRow(p5, "Bypass Speed", 16, function(v) walkSpeedValue = math.clamp(v, 0, 65) end)
+
+addHeader(p5, "BRING ITEMS CONFIG")
+makeInputRow(p5, "Orbit Speed", 1, function(v) orbitSpeed = v end)
+makeInputRow(p5, "Orbit Radius", 7, function(v) orbitRadius = v end)
+
+addHeader(p5, "DANGER ZONE")
+makeActionButton(p5, "Force Re-Equip (Unstuck)", function()
+    pcall(function()
+        local char = player.Character; local bp = player:FindFirstChild("Backpack")
+        if char and bp then for _, t in ipairs(char:GetChildren()) do if t:IsA("Tool") then t.Parent = bp end end end
+    end)
+end)
+makeActionButton(p5, "Reset Character", function()
+    pcall(function() player.Character:FindFirstChildOfClass("Humanoid").Health = 0 end)
+end)
+
+-- ── OPEN/CLOSE BUTTON ────────────────────────────────────────
+local hubBtn = Instance.new("TextButton"); hubBtn.Name = "HubToggleButton"; hubBtn.Size = UDim2.new(0,130,0,36)
+hubBtn.Position = UDim2.new(0,12,1,-50); hubBtn.BackgroundColor3 = C.accentDim; hubBtn.TextColor3 = C.text
+hubBtn.Font = Enum.Font.GothamBold; hubBtn.TextSize = 13; hubBtn.Text = "☰  OPEN HUB"; hubBtn.AutoButtonColor = false
+hubBtn.ClipsDescendants = true; hubBtn.ZIndex = 10; hubBtn.Parent = screenGui; corner(hubBtn,10)
+hubBtn.MouseButton1Click:Connect(function()
+    ripple(hubBtn); local vis = not mainWindow.Visible; mainWindow.Visible = vis
+    hubBtn.Text = vis and "✕  CLOSE HUB" or "☰  OPEN HUB"; tw(hubBtn, {BackgroundColor3 = vis and C.red or C.accentDim}, 0.15)
+    if vis then mainWindow.Size = UDim2.new(0,320,0,0); tw(mainWindow, {Size = UDim2.new(0,320,0,530)}, 0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out) end
+end)
+
+-- ============================================================
+--  INFINITE LOCKPICK — mshub ProximityPromptService method
+-- ============================================================
+ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeringPlayer)
+    if triggeringPlayer ~= player or not isInfItemsActive then return end
+    local char = player.Character
+    if not char then return end
+
+    local isDoorLock = prompt.Name == "UnlockPrompt" and prompt.Parent and prompt.Parent.Name == "Lock" and not prompt.Parent.Parent:GetAttribute("Opened")
+    local isSkeletonDoor = prompt.Name == "SkullPrompt" and prompt.Parent and prompt.Parent.Name == "SkullLock" and not (prompt.Parent:FindFirstChild("Door") and prompt.Parent.Door.Transparency == 1)
+    local isChestBox = prompt.Name == "ActivateEventPrompt" and prompt.Parent and prompt.Parent.Name == "ChestBoxLocked" and prompt.Parent:GetAttribute("Locked")
+    local isRoomsDoorLock = prompt.Parent and prompt.Parent.Parent and prompt.Parent.Parent.Parent and prompt.Parent.Parent.Parent.Name == "RoomsDoor_Entrance" and prompt.Enabled
+
+    if isDoorLock or isSkeletonDoor or isChestBox or isRoomsDoorLock then
+        local equippedTool = char:FindFirstChildOfClass("Tool")
+        if not equippedTool then return end
+
+        local isUniversal = equippedTool:GetAttribute("UniversalKey")
+        local isOldCheck = equippedTool.Name == "Lockpick" or equippedTool.Name == "Skeleton Key"
+
+        if not (isUniversal or isOldCheck) then return end
+
+        local toolId = equippedTool:GetAttribute("ID")
+        local remote = RemotesFolder and RemotesFolder:FindFirstChild("DropItem")
+        if not remote then return end
+
+        remote:FireServer(equippedTool)
+
+        task.spawn(function()
+            pcall(function()
+                task.wait(0.01)
+                if equippedTool and equippedTool.Parent then remote:FireServer(equippedTool) end
+                equippedTool.Destroying:Wait()
+                
+                local drops = workspace:FindFirstChild("Drops")
+                for i = 1, 30 do
+                    if not drops then drops = workspace:FindFirstChild("Drops") end
+                    if drops then
+                        for _, drop in ipairs(drops:GetChildren()) do
+                            if drop:GetAttribute("Tool_ID") == toolId then
+                                local pp = drop:FindFirstChild("ModulePrompt", true)
+                                if pp then firePrompt(pp) return end
+                            end
+                        end
+                    end
+                    task.wait()
+                end
+            end)
+        end)
+    end
+end)
+
+-- ============================================================
+--  ENTITY TRACKING
+-- ============================================================
+local function isValidEntity(e)
+    local name = e.Name:lower()
+    if not table.find(entList, name) then return false end
+    if name == "eyes" and e.Parent ~= workspace then return false end
+    if e:IsA("BasePart") and e.Parent and table.find(entList, e.Parent.Name:lower()) then return false end
+    return true
+end
+local function registerEntity(entity)
+    if not isValidEntity(entity) then return end
+    local part = resolveEntityPart(entity); if not part then return end
+    activeEntities[entity] = part; showEntityNotification(entity.Name)
+    if isEspActive then updateEntityESP() end
+    entity.AncestryChanged:Connect(function() if not entity.Parent then activeEntities[entity] = nil end end)
+end
+workspace.DescendantAdded:Connect(registerEntity)
+for _, v in ipairs(workspace:GetDescendants()) do
+    if isValidEntity(v) then local part = resolveEntityPart(v); if part then activeEntities[v] = part end end
+end
+
+-- ============================================================
+--  AUTO LOOT LOOP
+-- ============================================================
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if not isLootAuraActive then continue end
+        pcall(function()
+            local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); if not root then return end
+            local roomNum = player:GetAttribute("CurrentRoom"); local rooms = workspace:FindFirstChild("CurrentRooms")
+            if not (roomNum and rooms) then return end
+            local currentRoom = rooms:FindFirstChild(tostring(roomNum)); if not currentRoom then return end
+            if roomLastTime ~= roomNum then
+                local rawName = currentRoom:GetAttribute("RawName")
+                lootEnabledInRoom = (rawName ~= "Hotel_JeffShop" and rawName ~= "Sewer_JeffShop")
+                lastRoomObjects = {}; objectsenabled = {}; setupRoomTracking(currentRoom); roomLastTime = roomNum
+            end
+            if not lootEnabledInRoom then return end
+            for i = #lastRoomObjects, 1, -1 do
+                local lrobj = lastRoomObjects[i]
+                if lrobj and lrobj.Parent and not objectsenabled[lrobj] then
+                    local lrparent = lrobj.Parent
+                    local pos = (lrparent:IsA("BasePart") and lrparent.Position) or (lrparent:IsA("Model") and lrparent:GetPivot().Position)
+                    if pos and (root.Position - pos).Magnitude <= 25 then
+                        if openOnlyTargets[lrparent.Name] then
+                            if lrobj.ActionText == "Loot" then fireproximityprompt(lrobj)
+                            else objectsenabled[lrobj] = true; table.remove(lastRoomObjects, i) end
+                        elseif generalTargets[lrparent.Name] then
+                            if lrobj.Enabled then fireproximityprompt(lrobj)
+                            else if lrparent.Name ~= "Button" and lrparent.Name ~= "Lever" then objectsenabled[lrobj] = true; table.remove(lastRoomObjects, i) end end
+                        else table.remove(lastRoomObjects, i) end
+                    end
+                else table.remove(lastRoomObjects, i) end
+            end
+        end)
+    end
+end)
+
+-- ============================================================
+--  AUTO HEARTBEAT
+-- ============================================================
+pcall(function()
+    local mt; mt = hookmetamethod(game, "__namecall", function(self, ...)
+        if getnamecallmethod() == "FireServer" and self.Name == "ClutchHeartbeat" and isAutoHeartbeatActive then return end
+        return mt(self, ...)
+    end)
+end)
+
+-- ============================================================
+--  MAIN HEARTBEAT
+-- ============================================================
+RunService.Heartbeat:Connect(function(dt)
+    local now = tick()
+    if not isTrickFigureActive then pcall(updateAvoid, now) end
+
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not (hum and root) then return end
+
+    pcall(function() char:SetAttribute("SpeedBoostBehind", walkSpeedValue) end)
+
+    if isNoClipActive then
+        for _, part in ipairs(char:GetChildren()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end
+
+    if isAutoCrouchActive then
+        pcall(function()
+            safeFireServer("Crouch", true)
+            local mg = getMainGame(); if mg and mg.Movement then mg.Movement.crouching = true end
+        end)
+    end
+
+    if isAntiEyesActive then
+        pcall(function()
+            local eyes = workspace:FindFirstChild("Eyes")
+            if eyes then
+                if RemotesFolder then
+                    local mr = RemotesFolder:FindFirstChild("MotorReplication")
+                    if mr then mr:FireServer(-649) end
+                end
+            end
+        end)
+    end
+
+    if isAutoLookMonumentsActive then
+        pcall(function()
+            local mon = workspace:FindFirstChild("MonumentEntity") or workspace:FindFirstChild("Monument")
+            if mon then
+                local pos = mon:GetPivot().Position
+                root.CFrame = CFrame.lookAt(root.Position, Vector3.new(pos.X, root.Position.Y, pos.Z))
+            end
+        end)
+    end
+
+    if isAntiGroundskeeperActive then
+        local nearGK = false
+        for entity, part in pairs(activeEntities) do
+            if entity.Name:lower() == "groundskeeper" then
+                pcall(function() if (root.Position - part.Position).Magnitude < 70 then nearGK = true end end)
+                if nearGK then break end
+            end
+        end
+        if nearGK and hum.FloorMaterial == Enum.Material.Grass then hum.HipHeight = 7; wasGkHigh = true
+        elseif wasGkHigh then wasGkHigh = false; if not avoidActive and not isTrickFigureActive then hum.HipHeight = 2.4 end end
+    end
+
+    if isTrickFigureActive then
+        pcall(function()
+            local rn = ReplicatedStorage.GameData.LatestRoom.Value
+            local rm = workspace.CurrentRooms:FindFirstChild(tostring(rn))
+            local fig = rm and rm:FindFirstChild("FigureSetup") and rm.FigureSetup.FigureRig
+            if fig and fig:FindFirstChild("Root") then
+                if (root.Position - fig.Root.Position).Magnitude < 35 then
+                    local col = char:FindFirstChild("Collision")
+                    if col then safeFireServer("Crouch", true); col.Size = Vector3.new(1,0.001,3); hum.HipHeight = 0.0001 end
+                    local t = tick(); local angle = t*5
+                    root.CFrame = CFrame.new(fig.Root.Position + Vector3.new(math.sin(angle)*7, 14, math.cos(angle)*7))
+                    root.AssemblyLinearVelocity = Vector3.new(0,0,0)
+                end
+            end
+        end)
+    end
+
+    if isAutoLibraryActive then
+        pcall(function()
+            if ReplicatedStorage.GameData.LatestRoom.Value == 50 then
+                local hl = player.PlayerGui.MainUI.ItemRoom:FindFirstChild("LibraryHintLayer")
+                if hl then
+                    local code, complete = "", true
+                    for i = 1, 5 do
+                        local slot = hl:FindFirstChild(tostring(i)); local lbl = slot and slot:FindFirstChild("TextLabel")
+                        if lbl and lbl.Text ~= "_" and lbl.Text ~= "" then code = code..lbl.Text else complete = false; break end
+                    end
+                    if complete and #code == 5 then safeFireServer("Padlock", code) end
+                end
+            end
+        end)
+    end
+
+    if isNoVignetteActive then updateVignette() end
+    if isNoAmbienceActive then updateAmbience() end
+end)
+
+print("[Funny Hub V3] Loaded.")
