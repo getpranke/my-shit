@@ -160,7 +160,7 @@ Connections = {}
 Library:Notify("Loading Sapphire | Doors", 5)
 
 Window = Library:CreateWindow({
-    Title = '💎 Sapphire',
+    Title = '👾Bitical Hub👾',
     Footer = "LEAKED BY YUANTAI15041(3657198102)",
     Center = true,
     NotifySide = "Right",
@@ -4916,29 +4916,26 @@ Effect:AddToggle('NoVignette', {
     Default = false
 })
 local noVignetteLoop = nil
-local _cachedHideVignette = nil
-local function _getHideVignette()
-    if _cachedHideVignette and _cachedHideVignette.Parent then return _cachedHideVignette end
-    local pg = LocalPlayer.PlayerGui
-    local mf = pg and pg:FindFirstChild("MainUI") and pg.MainUI:FindFirstChild("MainFrame")
-    _cachedHideVignette = mf and mf:FindFirstChild("HideVignette")
-    return _cachedHideVignette
-end
 Toggles.NoVignette:OnChanged(function(Value)
-    if noVignetteLoop then noVignetteLoop:Disconnect(); noVignetteLoop = nil end
     if Value then
-        -- Apply immediately, then watch for visibility being forced back on
-        local v = _getHideVignette()
-        if v then v.Visible = false end
         noVignetteLoop = RunService.Heartbeat:Connect(function()
             if not Toggles.NoVignette.Value then return end
-            local hv = _getHideVignette()
-            -- Only write when the game re-shows it — avoids redundant property sets
-            if hv and hv.Visible then hv.Visible = false end
+            local playerGui = LocalPlayer.PlayerGui
+            if playerGui and playerGui:FindFirstChild("MainUI") then
+                local mainUI = playerGui.MainUI
+                if mainUI and mainUI:FindFirstChild("MainFrame") then
+                    local mainFrame = mainUI.MainFrame
+                    if mainFrame and mainFrame:FindFirstChild("HideVignette") then
+                        mainFrame.HideVignette.Visible = false
+                    end
+                end
+            end
         end)
     else
-        local hv = _getHideVignette()
-        if hv then hv.Visible = true end
+        if noVignetteLoop then
+            noVignetteLoop:Disconnect()
+            noVignetteLoop = nil
+        end
     end
 end)
 
@@ -4947,38 +4944,30 @@ Effect:AddToggle('NoOxygenVignette', {
     Default = false
 })
 local noOxygenVignetteLoop = nil
-local _oxygenLightingConn  = nil
-local _cachedEyelids        = nil
-local function _getEyelids()
-    if _cachedEyelids and _cachedEyelids.Parent then return _cachedEyelids end
-    local pg = LocalPlayer.PlayerGui
-    local mf = pg and pg:FindFirstChild("MainUI") and pg.MainUI:FindFirstChild("MainFrame")
-    _cachedEyelids = mf and mf:FindFirstChild("EyelidsVignette")
-    return _cachedEyelids
-end
 Toggles.NoOxygenVignette:OnChanged(function(Value)
-    if noOxygenVignetteLoop then noOxygenVignetteLoop:Disconnect(); noOxygenVignetteLoop = nil end
-    if _oxygenLightingConn  then _oxygenLightingConn:Disconnect();  _oxygenLightingConn = nil  end
     if Value then
-        local ev = _getEyelids(); if ev then ev.Visible = false end
-        for _, c in Lighting:GetChildren() do
-            if c.Name == "OxygenBlur" or c.Name == "OxygenCC" then c:Destroy() end
-        end
-        -- Only watch for the element being re-shown, not fire every frame
         noOxygenVignetteLoop = RunService.Heartbeat:Connect(function()
             if not Toggles.NoOxygenVignette.Value then return end
-            local ev2 = _getEyelids()
-            if ev2 and ev2.Visible then ev2.Visible = false end
-        end)
-        -- Destroy Lighting effects when they're added (event-driven, not per-frame)
-        _oxygenLightingConn = Lighting.ChildAdded:Connect(function(c)
-            if Toggles.NoOxygenVignette.Value then
-                if c.Name == "OxygenBlur" or c.Name == "OxygenCC" then c:Destroy() end
+            local playerGui = LocalPlayer.PlayerGui
+            if playerGui and playerGui:FindFirstChild("MainUI") then
+                local mainUI = playerGui.MainUI
+                if mainUI and mainUI:FindFirstChild("MainFrame") then
+                    local mainFrame = mainUI.MainFrame
+                    if mainFrame and mainFrame:FindFirstChild("EyelidsVignette") then
+                        mainFrame.EyelidsVignette.Visible = false
+                    end
+                end
             end
+            local oxygenBlur = Lighting:FindFirstChild("OxygenBlur")
+            if oxygenBlur then oxygenBlur:Destroy() end
+            local oxygenCC = Lighting:FindFirstChild("OxygenCC")
+            if oxygenCC then oxygenCC:Destroy() end
         end)
-        table.insert(Connections, _oxygenLightingConn)
     else
-        local ev = _getEyelids(); if ev then ev.Visible = true end
+        if noOxygenVignetteLoop then
+            noOxygenVignetteLoop:Disconnect()
+            noOxygenVignetteLoop = nil
+        end
     end
 end)
 
@@ -5420,15 +5409,11 @@ if Floor.Value == "Mines" then
         Callback = function(Value)
             if Value then
                 updateSeekPathLines()
-            seekPathUpdateConnection = (function()
-                local _seekLast = 0
-                return RunService.Heartbeat:Connect(function()
-                    local now = tick()
-                    if now - _seekLast < 0.5 then return end
-                    _seekLast = now
-                    updateSeekPathLines()
+                seekPathUpdateConnection = RunService.Heartbeat:Connect(function()
+                    if tick() % 0.5 < 0.016 then
+                        updateSeekPathLines()
+                    end
                 end)
-            end)()
             else
                 clearSeekPathLines()
             end
@@ -5536,27 +5521,16 @@ ModifiersBox:AddToggle('AntiGloomPile', {
         end
     end
 })
--- OPTIMIZED: was GetDescendants() every heartbeat frame (~60/s).
--- Now event-driven: apply once on toggle, then watch for new instances.
-local _antiGloomConn = nil
-local function _applyAntiGloom(v)
+table.insert(Connections, RunService.Heartbeat:Connect(function(dt)
     if Toggles.AntiGloomPile and Toggles.AntiGloomPile.Value then
-        if v.Name == "GloomEgg" then
-            local egg = v:FindFirstChild("Egg")
-            if egg then egg.CanTouch = false end
-        elseif v.Name == "Egg" and v.Parent and v.Parent.Name == "GloomEgg" then
-            v.CanTouch = false
+        for _, v in ipairs(workspace.CurrentRooms:GetDescendants()) do
+            if v.Name == "GloomEgg" then
+                local egg = v:FindFirstChild("Egg")
+                if egg then egg.CanTouch = false end
+            end
         end
     end
-end
-Toggles.AntiGloomPile:OnChanged(function(Value)
-    if _antiGloomConn then _antiGloomConn:Disconnect(); _antiGloomConn = nil end
-    if Value then
-        for _, v in ipairs(workspace.CurrentRooms:GetDescendants()) do _applyAntiGloom(v) end
-        _antiGloomConn = workspace.CurrentRooms.DescendantAdded:Connect(_applyAntiGloom)
-        table.insert(Connections, _antiGloomConn)
-    end
-end)
+end))
 
 ModifiersBox:AddToggle('AntiVacuum', {
     Text = "Anti Vacuum",
@@ -5625,10 +5599,8 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
     alive = LocalPlayer:GetAttribute("Alive")
     if not alive then return end
 
-    -- FULLBRIGHT: only write when the value has actually drifted (Doors resets it)
     if Toggles.Fullbright.Value then
-        local target = Color3.fromRGB(255, 255, 255)
-        if Lighting.Ambient ~= target then Lighting.Ambient = target end
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
     end
 
     if Toggles.NoCutscenes.Value then
@@ -5637,7 +5609,6 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ANTI-LOOKMAN: throttled to once per 0.1s; only fires when entity exists
     if Toggles.AntiLookman.Value then
         if Workspace:FindFirstChild("BackdoorLookman") then
             RemoteFolder.MotorReplication:FireServer(-890)
@@ -5657,8 +5628,20 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ANTI-VACUUM: moved to event-driven (see DescendantAdded below).
-    -- Nothing to do here per-frame.
+    if Toggles.AntiVacuum.Value then
+        for _, v in ipairs(workspace:GetChildren()) do
+            if v.Name == "SideroomSpace" then
+                v:WaitForChild("Collision").CanTouch = false
+                v:WaitForChild("Collision").CanCollide = true
+            end
+        end
+        for _, v in ipairs(workspace.CurrentRooms:GetChildren()) do
+            if v.Name == "SideroomSpace" then
+                v:WaitForChild("Collision").CanTouch = false
+                v:WaitForChild("Collision").CanCollide = true
+            end
+        end
+    end
 
     if Toggles.TransparencyCloset.Value then
         if Closet then
@@ -5679,20 +5662,17 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- DELETE FIGURE: cache the reference; only search again when it's gone
     if Toggles.DeleteFigure and Toggles.DeleteFigure.Value then
-        if not (_cachedFigure and _cachedFigure.Parent) then
-            _cachedFigure = workspace.CurrentRooms:FindFirstChild("FigureRig", true)
-        end
-        local Figure = _cachedFigure
+        local Figure = workspace.CurrentRooms:FindFirstChild("FigureRig", true)
         if Figure and Figure:FindFirstChild("Root") and isnetworkowner(Figure.Root) then
-            Figure.Root.Size = Vector3.new(0.4, 2000, 0.4)
-            Figure.Root.CanCollide = false
-            Figure.Hitbox.CanCollide = false
+            if Figure:FindFirstChild("Root") then
+                Figure.Root.Size = Vector3.new(0.4, 2000, 0.4)
+                Figure.Root.CanCollide = false
+                Figure.Hitbox.CanCollide = false
+            end
         end
     end
 
-    -- ANTI-EYES: only FireServer when Eyes actually exists; the check is cheap
     if Toggles.AntiEyes.Value then
         if Workspace:FindFirstChild("Eyes") then
             if RemoteFolder.Name == "Bricks" or RemoteFolder.Name == "EntityInfo" then
@@ -5709,8 +5689,46 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ANTI-DUPE: moved to event-driven (see OnChanged + DescendantAdded below).
-    -- ANTI-SNARE: moved to event-driven (see OnChanged + DescendantAdded below).
+    if Toggles.AntiDupe.Value then
+        for _, v in ipairs(workspace.CurrentRooms[LocalPlayer:GetAttribute("CurrentRoom")]:GetChildren()) do
+            if v and v.Name == "SideroomDupe" then
+                local fakeDoor = v:FindFirstChild("DoorFake")
+                if fakeDoor then
+                    local hidden = fakeDoor:FindFirstChild("Hidden")
+                    if hidden then hidden.CanTouch = false end
+                end
+            end
+        end
+    end
+    for _, v in ipairs(workspace.CurrentRooms[LocalPlayer:GetAttribute("CurrentRoom")]:GetChildren()) do
+        if v.Name == "SideroomDupe" then
+            if v:FindFirstChild("DoorFake"):FindFirstChild("Lock") then
+                local prompt = v.DoorFake.Lock:FindFirstChildOfClass("ProximityPrompt")
+                if prompt then prompt.Enabled = not Toggles.AntiDupe.Value end
+            end
+        end
+    end
+
+    if Toggles.AntiSnare.Value then
+        for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
+            if room:FindFirstChild("Snares") then
+                for _, v in ipairs(room.Snares:GetChildren()) do
+                    if v.Name == "Snare" then
+                        local hitbox = v:FindFirstChild("Hitbox")
+                        if hitbox then hitbox.CanTouch = false end
+                    end
+                end
+            end
+            if room:FindFirstChild("Assets") then
+                for _, v in ipairs(room.Assets:GetChildren()) do
+                    if v.Name == "Snare" then
+                        local hitbox = v:FindFirstChild("Hitbox")
+                        if hitbox then hitbox.CanTouch = false end
+                    end
+                end
+            end
+        end
+    end
 
     if Toggles.Spamtoolz and Toggles.Spamtoolz.Value and Options.Spamtoolz_X and Options.Spamtoolz_X:GetState() then
         task.wait()
@@ -5745,28 +5763,24 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
     end
 
     if Toggles.SpeedBoost.Value then
-        if Floor.Value == "Mines" then
-            local isClimbing = LocalPlayer.Character:GetAttribute("Climbing")
-            Character.Humanoid.WalkSpeed = isClimbing and (Speed + Options.LadderSpeedBoost.Value) or Speed
+        Character.Humanoid.WalkSpeed = Speed
+    end
+
+    if Toggles.SpeedBoost.Value and Floor.Value == "Mines" then
+        local isClimbing = LocalPlayer.Character:GetAttribute("Climbing")
+        if isClimbing then
+            Character.Humanoid.WalkSpeed = Speed + Options.LadderSpeedBoost.Value
         else
             Character.Humanoid.WalkSpeed = Speed
         end
     end
 
-    -- NO ACCELERATION: only write when state changes, not every frame.
-    -- The toggle OnChanged handler below keeps state; here we just guard
-    -- against respawn resetting the properties.
-    if _noAccelDirty then
-        _noAccelDirty = false
-        if Toggles.Noacceleration.Value then
-            local p = PhysicalProperties.new(100, 0.5, 0.2)
-            Character.HumanoidRootPart.CustomPhysicalProperties = p
-            Character.Collision.CustomPhysicalProperties = p
-        else
-            local p = PhysicalProperties.new(0.4, 0.2, 0.2)
-            Character.HumanoidRootPart.CustomPhysicalProperties = p
-            Character.Collision.CustomPhysicalProperties = p
-        end
+    if Toggles.Noacceleration.Value then
+        Character.HumanoidRootPart.CustomPhysicalProperties = PhysicalProperties.new(100, 0.5, 0.2)
+        Character.Collision.CustomPhysicalProperties = PhysicalProperties.new(100, 0.5, 0.2)
+    else
+        Character.HumanoidRootPart.CustomPhysicalProperties = PhysicalProperties.new(0.4, 0.2, 0.2)
+        Character.Collision.CustomPhysicalProperties = PhysicalProperties.new(0.4, 0.2, 0.2)
     end
 
     if Toggles.NoClosetExitDelay.Value and LocalPlayer.Character:GetAttribute("Hiding") == true then
@@ -5843,91 +5857,6 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         end
     end
 end))
-
--- ============================================================
---  OPTIMIZED EVENT-DRIVEN REPLACEMENTS
--- ============================================================
-
--- Figure cache for DeleteFigure — cleared when rooms change
-local _cachedFigure = nil
-workspace.CurrentRooms.ChildAdded:Connect(function() _cachedFigure = nil end)
-
--- NO ACCELERATION dirty flag: only apply properties when something changed
-local _noAccelDirty = false
-Toggles.Noacceleration:OnChanged(function() _noAccelDirty = true end)
-LocalPlayer.CharacterAdded:Connect(function() _noAccelDirty = true end)
-
--- ANTI-DUPE: event-driven (was two full GetChildren loops per frame)
-local _antiDupeConns = {}
-local function _applyAntiDupe(v)
-    if not (Toggles.AntiDupe and Toggles.AntiDupe.Value) then return end
-    if v.Name == "SideroomDupe" then
-        local fakeDoor = v:FindFirstChild("DoorFake")
-        if fakeDoor then
-            local hidden = fakeDoor:FindFirstChild("Hidden")
-            if hidden then hidden.CanTouch = false end
-            local lock = fakeDoor:FindFirstChild("Lock")
-            if lock then
-                local p = lock:FindFirstChildOfClass("ProximityPrompt")
-                if p then p.Enabled = false end
-            end
-        end
-    end
-end
-Toggles.AntiDupe:OnChanged(function(Value)
-    for _, c in ipairs(_antiDupeConns) do c:Disconnect() end
-    _antiDupeConns = {}
-    if Value then
-        for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
-            for _, v in ipairs(room:GetChildren()) do _applyAntiDupe(v) end
-        end
-        local c1 = workspace.CurrentRooms.DescendantAdded:Connect(_applyAntiDupe)
-        table.insert(_antiDupeConns, c1); table.insert(Connections, c1)
-    end
-end)
-
--- ANTI-SNARE: event-driven (was full GetDescendants on every room per frame)
-local _antiSnareConns = {}
-local function _applyAntiSnare(v)
-    if not (Toggles.AntiSnare and Toggles.AntiSnare.Value) then return end
-    if v.Name == "Snare" then
-        local hb = v:FindFirstChild("Hitbox")
-        if hb then hb.CanTouch = false end
-    elseif v.Name == "Hitbox" and v.Parent and v.Parent.Name == "Snare" then
-        v.CanTouch = false
-    end
-end
-Toggles.AntiSnare:OnChanged(function(Value)
-    for _, c in ipairs(_antiSnareConns) do c:Disconnect() end
-    _antiSnareConns = {}
-    if Value then
-        for _, v in ipairs(workspace.CurrentRooms:GetDescendants()) do _applyAntiSnare(v) end
-        local c1 = workspace.CurrentRooms.DescendantAdded:Connect(_applyAntiSnare)
-        table.insert(_antiSnareConns, c1); table.insert(Connections, c1)
-    end
-end)
-
--- ANTI-VACUUM: event-driven (was GetChildren + WaitForChild per frame)
-local _antiVacuumConns = {}
-local function _applyAntiVacuum(v)
-    if not (Toggles.AntiVacuum and Toggles.AntiVacuum.Value) then return end
-    if v.Name == "SideroomSpace" then
-        local col = v:FindFirstChild("Collision")
-        if col then col.CanTouch = false; col.CanCollide = true end
-    end
-end
-Toggles.AntiVacuum:OnChanged(function(Value)
-    for _, c in ipairs(_antiVacuumConns) do c:Disconnect() end
-    _antiVacuumConns = {}
-    if Value then
-        for _, v in ipairs(workspace:GetChildren()) do _applyAntiVacuum(v) end
-        for _, v in ipairs(workspace.CurrentRooms:GetChildren()) do _applyAntiVacuum(v) end
-        local c1 = workspace.ChildAdded:Connect(_applyAntiVacuum)
-        local c2 = workspace.CurrentRooms.ChildAdded:Connect(_applyAntiVacuum)
-        table.insert(_antiVacuumConns, c1); table.insert(Connections, c1)
-        table.insert(_antiVacuumConns, c2); table.insert(Connections, c2)
-    end
-end)
 
 table.insert(Connections, workspace.DescendantAdded:Connect(function(v)
     local Delay = math.random(200, 270) / 1000
