@@ -162,8 +162,6 @@ MiscBox = Tabs.Player:AddRightGroupbox("Misc")
 Anti = Tabs.Exploits:AddLeftGroupbox('Entity Prevention')
 Bypass = Tabs.Exploits:AddRightGroupbox('Bypass')
 Troll = Tabs.Exploits:AddLeftGroupbox('Trolling')
-
--- Universal moved to Exploits tab
 ExploitsUniversal = Tabs.Exploits:AddLeftGroupbox('Universal')
 
 TabBox = Tabs.Visuals:AddLeftTabbox()
@@ -177,7 +175,6 @@ TabBox3 = Tabs.Visuals:AddRightTabbox()
 Self = TabBox3:AddTab('Self')
 Effect = TabBox3:AddTab('Effects')
 
--- Floors tab groupboxes (with visibility control)
 FloorsHotel      = Tabs.Floor:AddLeftGroupbox('Hotel / Fools')
 FloorsMines      = Tabs.Floor:AddLeftGroupbox('Mines (Floor 2)')
 FloorsRooms      = Tabs.Floor:AddLeftGroupbox('Rooms')
@@ -193,41 +190,31 @@ SettingsBox = Tabs.UISettings:AddLeftGroupbox('UI', 'wrench')
 
 Tabs.Homepage:UpdateWarningBox({
     Title = "Changelog:",
-    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Fixed Anti Jamming\nFixed UI style LinoriaLib\nImproved fake death\n+ Abysall & Tplays features\n+ Floor-sorted layout</font>",
+    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Fixed Anti Jamming\nFixed UI style LinoriaLib\nImproved fake death\n+ Abysall & Tplays features\n+ Floor-sorted layout\n+ Show Current Floor button</font>",
     IsNormal = true, Visible = true, LockSize = true,
 })
 
 -- ═══════════════════════════════════════════════════════════════
 -- FLOOR VISIBILITY MANAGER
--- Hides groupboxes for floors that aren't the current floor.
--- Uses multiple access patterns to support Linoria/Obsidian.
 -- ═══════════════════════════════════════════════════════════════
 local function setGroupboxVisible(groupbox, visible)
     if not groupbox then return end
-    -- Try all known patterns
     pcall(function()
-        if groupbox.Frame and groupbox.Frame.Visible ~= visible then
-            groupbox.Frame.Visible = visible
-        end
+        if groupbox.Frame and groupbox.Frame.Visible ~= visible then groupbox.Frame.Visible = visible end
     end)
     pcall(function()
-        if groupbox.Holder and groupbox.Holder.Visible ~= visible then
-            groupbox.Holder.Visible = visible
-        end
+        if groupbox.Holder and groupbox.Holder.Visible ~= visible then groupbox.Holder.Visible = visible end
     end)
     pcall(function()
-        if groupbox.Groupbox and groupbox.Groupbox.Visible ~= visible then
-            groupbox.Groupbox.Visible = visible
-        end
+        if groupbox.Groupbox and groupbox.Groupbox.Visible ~= visible then groupbox.Groupbox.Visible = visible end
     end)
-    -- Fallback: iterate through UIElements and hide their parent frame
     pcall(function()
         if groupbox.UIElements and next(groupbox.UIElements) then
             local first = next(groupbox.UIElements)
             if first then
                 local f = first
                 while f and f.Parent and f.Parent ~= game:GetService("CoreGui") do
-                    if f:IsA("Frame") and f.Name == "Groupbox" or f.Name == "GroupBox" then
+                    if f:IsA("Frame") and (f.Name == "Groupbox" or f.Name == "GroupBox") then
                         f.Visible = visible
                         break
                     end
@@ -255,18 +242,12 @@ local function updateFloorVisibility()
     local visibleSet = floorVisibilityMap[current] or {}
     local visibleLookup = {}
     for _, g in ipairs(visibleSet) do visibleLookup[g] = true end
-
-    -- All floor-specific groupboxes
     for _, g in ipairs({ FloorsHotel, FloorsMines, FloorsRooms, FloorsBackdoor, FloorsGarden, FloorsRipple }) do
         setGroupboxVisible(g, visibleLookup[g] == true)
     end
 end
 
--- Initial + on floor change
-task.spawn(function()
-    task.wait(0.5)
-    updateFloorVisibility()
-end)
+task.spawn(function() task.wait(0.5) updateFloorVisibility() end)
 if Floor:IsA("StringValue") then
     table.insert(Connections, Floor.Changed:Connect(function()
         task.wait(0.2)
@@ -291,6 +272,30 @@ User:AddButton({
     end
 })
 Info:AddLabel("[<font color=\"rgb(73,230,133)\">????</font>] LEAKER")
+
+-- ⭐ [FLOOR NAME BUTTON] — shows current floor in a notification
+Info:AddDivider()
+Info:AddButton({
+    Text = "Show Current Floor",
+    DoubleClick = false,
+    Tooltip = "Displays the current floor name in a notification.",
+    Func = function()
+        local floorName = (Floor and Floor.Value) or "Unknown"
+        Library:Notify({
+            Title = "Current Floor",
+            Description = "You are currently on: <font color=\"rgb(73,230,133)\">" .. tostring(floorName) .. "</font>",
+            Time = 5
+        })
+        print("[Bitical] Current Floor: " .. tostring(floorName))
+        Sound()
+    end,
+})
+local floorNameLabel = Info:AddLabel("Current Floor: " .. tostring(Floor and Floor.Value or "Unknown"))
+if Floor and Floor:IsA("StringValue") then
+    table.insert(Connections, Floor.Changed:Connect(function()
+        pcall(function() floorNameLabel:SetText("Current Floor: " .. tostring(Floor.Value)) end)
+    end))
+end
 
 -- ═══════════ PLAYER — MOVEMENT ═══════════
 Movement:AddToggle('SpeedBoost', {
@@ -1015,8 +1020,11 @@ Toggles.CrouchSpoof:OnChanged(function(Value)
 end)
 Bypass:AddDivider()
 
--- [TPLAYS] Position Offset Alt (CollisionOffsetGodmodeAlt)
+-- [TPLAYS] Position Offset Alt
 local cogAlt = false
+local slideSH = false
+local noSpread = false
+local fastThrow = false
 local OGC1 = Character.LowerTorso and Character.LowerTorso.Root and Character.LowerTorso.Root.C1
 local hookNamecall
 if hookmetamethod then
@@ -1076,8 +1084,6 @@ Bypass:AddToggle('CollisionOffsetGodmodeAlt', {
 })
 
 -- [TPLAYS] NoSpread / FastThrow
-local noSpread = false
-local fastThrow = false
 Bypass:AddToggle('NoSpread', {
     Text = 'No Spread', Default = false,
     Tooltip = 'Accurate prop throw',
@@ -1095,7 +1101,6 @@ Bypass:AddToggle('FastThrow', {
 Bypass:AddDivider()
 
 -- [TPLAYS] Slide SpeedHack
-local slideSH = false
 local walkspeed = 15
 local ladderspeed = 15
 
@@ -1142,14 +1147,14 @@ Bypass:AddSlider("TplaysLadderSpeedHack", {
 })
 Bypass:AddDivider()
 
--- ⭐ ANTICHEAT MANIPULATION — dropdown REMOVED, only toggle + keybind retained
+-- ⭐ ANTICHEAT MANIPULATION — only toggle + keybind
 AnticheatManipulationLoop = nil
 AnticheatManipulationOrigin = nil
 AnticheatManipulationEnabled = false
 OriginalNoclipState = false
 Bypass:AddToggle('AnticheatManipulation', {
     Text = "Manipulator", Default = false,
-    Tooltip = "Manipulates anticheat (methods available via the dropdown — removed; toggle+keybind only).",
+    Tooltip = "Manipulates anticheat (continuous subtle teleport).",
     Callback = function(Value)
         if Value then
             AnticheatManipulationEnabled = true
@@ -1209,7 +1214,7 @@ Bypass:AddToggle('UseToolsAnyWhere', {
     Callback = function(Value) RequiredMainGame.canUseItems = Value end
 })
 
--- Infinite items system (lockpicks/shears)
+-- Infinite items
 local Disable3 = false
 local Prompt = Instance.new("ProximityPrompt", workspace); Prompt.Name = "TestPrompt"
 pcall(function() return fireproximityprompt(Prompt) end); Prompt:Destroy()
@@ -1377,7 +1382,7 @@ Bypass:AddToggle('InfiniteCrucifix', {
     end
 })
 
--- ═══════════ EXPLOITS — UNIVERSAL (moved from Floors) ═══════════
+-- ═══════════ EXPLOITS — UNIVERSAL ═══════════
 ExploitsUniversal:AddButton({
     Text = "Bring Drops (FE)", DoubleClick = false,
     Tooltip = "Brings all dropped items to your current position.",
@@ -1588,7 +1593,6 @@ Troll:AddToggle("StunPlayer", {
     Text = "Stun", Default = false,
     Callback = function(Value) if LocalPlayer.Character then LocalPlayer.Character:SetAttribute("Stunned", Value) end end
 })
--- [TPLAYS] Thinking Animation
 local thinkanims = {'18885101321', '18885098453', '18885095182'}
 local animtrack
 Troll:AddToggle('ThinkingAnimation', {
@@ -1705,24 +1709,7 @@ table.insert(Connections, workspace.CurrentRooms.ChildAdded:Connect(function(roo
         end
     end
 end))
-table.insert(Connections, LocalPlayer:GetAttributeChangedSignal("CurrentRoom"):Connect(function()
-    if Toggles.Door and Toggles.Door.Value then
-        for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
-            if room:FindFirstChild("Door") and room.Door:FindFirstChild("Door") then RemoveDoorESP(room.Door.Door) end
-        end
-        local cr = LocalPlayer:GetAttribute("CurrentRoom")
-        if cr then
-            for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
-                local roomNumber = tonumber(room.Name)
-                if roomNumber and (roomNumber == cr or roomNumber == cr + 1) then
-                    if room:FindFirstChild("Door") and room.Door:FindFirstChild("Door") then AddDoorESP(room.Door.Door, roomNumber) end
-                end
-            end
-        end
-    end
-end))
 
--- Other ESP toggles (TaskESP, HidingSpots, Chest, Players, Gold, Items, Stardust, Entities)
 local TaskESPObjects = {}
 local TaskColor = Color3.new(0, 1, 0)
 local function AddTaskESP(item, text, color)
@@ -1779,7 +1766,6 @@ ESP:AddToggle('TaskESP', {
     end
 }):AddColorPicker('TaskColor', { Default = TaskColor, Title = 'Task Color', Transparency = 0 })
 
--- Hiding Spots ESP
 local HidingSpots = {
     Wardrobe = "Wardrobe", Rooms_Locker = "Wardrobe", Backdoor_Wardrobe = "Wardrobe",
     Toolshed = "Wardrobe", Locker_Large = "Wardrobe", Bed = "Bed", CircularVent = "Vent",
@@ -1800,24 +1786,22 @@ local function AddHidingSpotESP(model, text)
     })
     HidingSpotESPObjects[model] = espObject; espObject:Show()
 end
-local function ScanAndAddHidingSpots()
-    for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
-        local roomNumber = tonumber(room.Name)
-        if roomNumber and shouldShowESP(roomNumber) then
-            local assets = room:FindFirstChild("Assets")
-            if assets then
-                for _, spot in ipairs(assets:GetChildren()) do
-                    local spotName = HidingSpots[spot.Name]
-                    if spotName and spot.PrimaryPart then AddHidingSpotESP(spot, spotName) end
-                end
-            end
-        end
-    end
-end
 ESP:AddToggle('HidingSpotESP', {
     Text = "Hiding Spots", Default = false,
     Callback = function(Value)
-        if Value then ScanAndAddHidingSpots()
+        if Value then
+            for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
+                local roomNumber = tonumber(room.Name)
+                if roomNumber and shouldShowESP(roomNumber) then
+                    local assets = room:FindFirstChild("Assets")
+                    if assets then
+                        for _, spot in ipairs(assets:GetChildren()) do
+                            local spotName = HidingSpots[spot.Name]
+                            if spotName and spot.PrimaryPart then AddHidingSpotESP(spot, spotName) end
+                        end
+                    end
+                end
+            end
         else
             for _, espObject in pairs(HidingSpotESPObjects) do if espObject then espObject:Destroy() end end
             HidingSpotESPObjects = {}
@@ -1825,7 +1809,6 @@ ESP:AddToggle('HidingSpotESP', {
     end
 }):AddColorPicker('HidingSpotColorPicker', { Default = HidingSpotColor, Title = 'Hiding Spot Color', Transparency = 0 })
 
--- Chest ESP
 local ChestColor = Color3.new(1, 0.8, 0)
 local ChestESPObjects = {}
 local function AddChestESP(model, text, color)
@@ -1841,26 +1824,24 @@ local function AddChestESP(model, text, color)
     })
     ChestESPObjects[model] = espObject; espObject:Show()
 end
-local function ScanAndAddChests()
-    for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
-        local roomNumber = tonumber(room.Name)
-        if roomNumber and shouldShowESP(roomNumber) then
-            for _, v in ipairs(room:GetDescendants()) do
-                if v.Name == "Toolshed_Small" or v.Name == "Chest_Vine" or v.Name == "ChestBoxLocked" or v.Name == "ChestBox" then
-                    local displayText = "Chest"
-                    if v.Name == "Chest_Vine" then displayText = "[Vines] Chest"
-                    elseif v.Name == "ChestBoxLocked" then displayText = "[Locked] Chest"
-                    elseif v.Name == "Toolshed_Small" then displayText = "Shears Cabinet" end
-                    AddChestESP(v, displayText, ChestColor)
-                end
-            end
-        end
-    end
-end
 ESP:AddToggle('Chest', {
     Text = "Chest", Default = false,
     Callback = function(Value)
-        if Value then ScanAndAddChests()
+        if Value then
+            for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
+                local roomNumber = tonumber(room.Name)
+                if roomNumber and shouldShowESP(roomNumber) then
+                    for _, v in ipairs(room:GetDescendants()) do
+                        if v.Name == "Toolshed_Small" or v.Name == "Chest_Vine" or v.Name == "ChestBoxLocked" or v.Name == "ChestBox" then
+                            local displayText = "Chest"
+                            if v.Name == "Chest_Vine" then displayText = "[Vines] Chest"
+                            elseif v.Name == "ChestBoxLocked" then displayText = "[Locked] Chest"
+                            elseif v.Name == "Toolshed_Small" then displayText = "Shears Cabinet" end
+                            AddChestESP(v, displayText, ChestColor)
+                        end
+                    end
+                end
+            end
         else
             for _, espObject in pairs(ChestESPObjects) do if espObject then espObject:Destroy() end end
             ChestESPObjects = {}
@@ -1868,27 +1849,22 @@ ESP:AddToggle('Chest', {
     end
 }):AddColorPicker('ChestColor', { Default = ChestColor, Title = 'Chest Color', Transparency = 0 })
 
--- Players ESP (simplified)
 local PlayersColor = Color3.new(1, 1, 1)
 local PlayerESPObjects = {}
 ESP:AddToggle('Players', { Text = "Players", Default = false }):AddColorPicker('PlayersColor', { Default = PlayersColor, Title = 'Players Color', Transparency = 0 })
 
--- Gold ESP
 local GoldColor = Color3.new(1, 0.8, 0)
 local GoldESPObjects = {}
 ESP:AddToggle('GoldESP', { Text = "Gold", Default = false }):AddColorPicker('GoldColorPicker', { Default = GoldColor, Title = 'Gold Color', Transparency = 0 })
 
--- Items ESP (simplified)
 local ItemsColor = Color3.new(1, 0, 1)
 local ItemsESPObjects = {}
 ESP:AddToggle('Items', { Text = "Items", Default = false }):AddColorPicker('ItemsColorPicker', { Default = ItemsColor, Title = 'Items Color', Transparency = 0 })
 
--- Stardust ESP
 local StardustColor = Color3.new(1, 0.5, 0.8)
 local StardustESPObjects = {}
 ESP:AddToggle('Stardust', { Text = "Stardust", Default = false }):AddColorPicker('StardustColor', { Default = StardustColor, Title = 'Stardust Color', Transparency = 0 })
 
--- Entities ESP
 local EntityColor = Color3.new(1, 0, 0)
 local EntityESPObjects = {}
 ESP:AddToggle('EntitiesESP', { Text = "Entities", Default = false }):AddColorPicker('EntityColorPicker', { Default = EntityColor, Title = 'Entity Color', Transparency = 0 })
@@ -1938,7 +1914,6 @@ Ambient:AddToggle('AntiFog', {
     end
 })
 Ambient:AddToggle('AntiLag', { Text = "Anti Lag", Default = false })
--- [TPLAYS] No Random Ambience
 Ambient:AddToggle('RemoveAmbience', {
     Text = 'No Random Ambience', Default = false,
     Callback = function(value)
@@ -1953,7 +1928,6 @@ Ambient:AddToggle('RemoveAmbience', {
 })
 
 -- ═══════════ VISUALS — SELF ═══════════
--- Third person
 local ThirdPersonHandler = { enabled = false, offset = Vector3.new(2, 0, 6) }
 local X, Y, Z = 2, 0, 6
 local function ThirdPersonStep()
@@ -1989,11 +1963,8 @@ Self:AddSlider("Y", { Text = "Y", Default = Y, Min = -10, Max = 10, Rounding = 0
 Self:AddSlider("Z", { Text = "Z", Default = Z, Min = -10, Max = 10, Rounding = 0, Compact = true, Callback = function(v) Z = v ThirdPersonHandler.offset = Vector3.new(X, Y, Z) end })
 Self:AddDivider()
 
--- FOV
-local View = 70
 Self:AddSlider("FieldofViewAdjust", { Text = "FOV", Default = 70, Min = 70, Max = 120, Rounding = 1, Compact = false })
 Self:AddToggle('Fieldofview', { Text = "FOV Enabled", Default = false })
-
 Self:AddToggle('NoCameraShake', { Text = "No Camera Shake", Default = false })
 Self:AddToggle('NoLookBob', { Text = "No Look Bob", Default = false })
 Toggles.NoLookBob:OnChanged(function()
@@ -2003,8 +1974,6 @@ Toggles.NoLookBob:OnChanged(function()
 end)
 Self:AddToggle('TransparencyCloset', { Text = "Closet Transparency", Default = false })
 Self:AddSlider("TransparencySlider", { Text = "Closet Opacity", Default = 0.5, Min = 0.1, Max = 1, Rounding = 1, Compact = true })
-
--- [TPLAYS] Freecam
 Self:AddToggle('Freecam', {
     Text = 'Freecam', Default = false,
     DisabledTooltip = 'Executor not supported',
@@ -2026,9 +1995,7 @@ Self:AddToggle('Freecam', {
         end
     end
 })
-
 Self:AddDivider()
--- Tool offset
 Self:AddToggle('ToolOffset', { Text = 'ViewModel Offset', Default = false })
 Self:AddSlider('ToolOffsetX', { Text = 'X', Min = -10, Max = 10, Default = 0, Rounding = 2, Compact = true })
 Self:AddSlider('ToolOffsetY', { Text = 'Y', Min = -10, Max = 10, Default = 0, Rounding = 2, Compact = true })
@@ -2042,7 +2009,6 @@ Effect:AddToggle('AntiSpider', { Text = "No Spider Jumpscare", Default = false }
 Effect:AddToggle('NoBatDecor', { Text = "No Bat Decoration", Default = false })
 Effect:AddToggle('NoVignette', { Text = "No Closet Vignette", Default = false })
 Effect:AddToggle('NoOxygenVignette', { Text = "No Oxygen Vignette", Default = false })
--- [TPLAYS] No Wardrobe Vignette (Tplay's variant)
 Effect:AddToggle('NoWardrobeVignette', {
     Text = 'No Wardrobe Vignette', Default = false,
     Callback = function(value)
@@ -2051,7 +2017,6 @@ Effect:AddToggle('NoWardrobeVignette', {
         else vignette.Size = UDim2.new(1, 0, 1, 0) end
     end
 })
--- [TPLAYS] Replace GL With Glitch
 Effect:AddToggle('ReplaceGLwG', {
     Text = 'Replace GL With Glitch', Default = false,
     Tooltip = 'Replace Guiding Light With Glitch',
@@ -2078,7 +2043,7 @@ Effect:AddToggle('ReplaceGLwG', {
 })
 
 -- ═══════════════════════════════════════════════════════════════
--- FLOORS TAB — FLOOR-SPECIFIC FEATURES
+-- FLOORS TAB
 -- ═══════════════════════════════════════════════════════════════
 
 -- ─── HOTEL / FOOLS ───
@@ -2099,10 +2064,8 @@ FloorsHotel:AddToggle('NoPuzzleDoors', {
         end
     end
 })
--- [TPLAYS] Current Hide Time (Hotel)
 FloorsHotel:AddToggle('CurrentHideTime', {
     Text = 'Current Hide Time', Default = false,
-    Disabled = Floor.Value ~= "Hotel",
     DisabledTooltip = "Only for Hotel floor",
     Callback = function(value)
         if value then
@@ -2122,7 +2085,7 @@ FloorsHotel:AddToggle('CurrentHideTime', {
     end
 })
 
--- ─── MINES (FLOOR 2) ───
+-- ─── MINES ───
 FloorsMines:AddToggle('AutoAnchorSolver', { Text = "Auto Solve Anchors", Default = false })
 FloorsMines:AddToggle('AutoSteerMinecart', { Text = "Auto Steer Minecart", Default = false })
 FloorsMines:AddSlider("AutoSteerMinecartTurnDistance", { Text = "Turn Distance", Default = 30, Min = 20, Max = 40, Rounding = 0, Compact = true })
@@ -2135,7 +2098,6 @@ FloorsMines:AddToggle("ABF", { Text = "Anti Bridge Fall", Default = false })
 FloorsMines:AddToggle('AntiKillbricks', { Text = "Anti Killbricks", Default = false })
 FloorsMines:AddToggle("ShowSeekPath", { Text = "Show Seek Path", Default = false }):AddColorPicker('SeekPathColorPicker', { Default = Color3.new(0, 1, 0), Title = 'Path Color', Transparency = 0 })
 
--- [TPLAYS] Disable Mines Echo
 local GameDataRef = ReplicatedStorage:WaitForChild("GameData")
 local FloorValueRef = GameDataRef:WaitForChild("Floor")
 local function applyEchoSetting(enabled)
@@ -2197,7 +2159,6 @@ FloorsMines:AddButton({
     end
 })
 
--- Mines background: auto anchor / minecart / seek path
 do
     local autoAnchorRunning = false
     local autoAnchorConnection = nil
@@ -2263,7 +2224,6 @@ do
         end
     end)
 
-    -- Minecart auto steer
     local Minecart = { NearestTurnNode = nil, Ducked = false, LastDuck = 0 }
     local function GetMinecart() local cam = workspace.CurrentCamera return cam and cam:FindFirstChild("MinecartRig") ~= nil end
     local function GetNearestTurnNode()
@@ -2326,7 +2286,6 @@ do
         end
     end)
 
-    -- Anticheat bypass climbing listener
     Toggles.AnticheatBypass:OnChanged(function(Value)
         if not Value then RemoteFolder.ClimbLadder:FireServer() end
         if Value then Library:Notify("Climb a ladder to bypass anticheat", 9) end
@@ -2339,14 +2298,12 @@ do
         end
     end)
 
-    -- Anti Killbricks
     Toggles.AntiKillbricks:OnChanged(function(Value)
         for _, obj in ipairs(workspace.CurrentRooms:GetDescendants()) do
             if obj.Name == "Lava" and obj:IsA("BasePart") then obj.CanTouch = not Value end
         end
     end)
 
-    -- Anti Bridge Fall
     Toggles.ABF:OnChanged(function(on)
         local clones, bridgeConns = {}, {}
         local function makeBarrier(barrier)
@@ -2392,13 +2349,11 @@ do
         end
     end)
 
-    -- Anti Seek Flood
     Toggles.AntiSeekFlood:OnChanged(function(Value)
         local r = ReplicatedStorage.RemotesFolder:FindFirstChild("SeekSlop")
         if r then r.Name = Value and "_SeekSlop" or "SeekSlop" end
     end)
 
-    -- Seek path lines
     local seekPathLines = {}
     task.spawn(function()
         while task.wait(0.5) do
@@ -2427,10 +2382,6 @@ do
             end
         end
     end)
-
-    -- [TPLAYS] Current Hide Time (Mines)
-    local notif
-    Toggles.CurrentHideTime = nil -- placeholder to avoid conflict; add mines version
 end
 
 -- ─── ROOMS ───
@@ -2488,7 +2439,6 @@ FloorsGarden:AddToggle('AntiGiggle', {
     end
 })
 
--- [TPLAYS] Anti Groundskeeper
 local Groundskeepers = {}
 local function addGS(gs)
     if gs.Name == "Groundskeeper" and gs:FindFirstChild("HumanoidRootPart") then
@@ -2501,15 +2451,13 @@ CurrentRooms.DescendantRemoving:Connect(function(gs)
     local found = table.find(Groundskeepers, gs)
     if found then table.remove(Groundskeepers, found) end
 end)
-
-local function ShouldSpoof(hrp)
+local function ShouldSpoofGS(hrp)
     for _, gs in Groundskeepers do
         local root = gs:FindFirstChild("HumanoidRootPart")
         if root and (root.Position - hrp.Position).Magnitude < 110 then return true end
     end
     return false
 end
-
 FloorsGarden:AddToggle('AntiGroundskeeper', {
     Text = 'Anti Groundskeeper', Default = false,
     DisabledTooltip = "Floor is not supported",
@@ -2519,7 +2467,7 @@ FloorsGarden:AddToggle('AntiGroundskeeper', {
             if Toggles.CollisionOffsetGodmodeAlt then Toggles.CollisionOffsetGodmodeAlt:SetValue(false) end
             Connections.AGS = RunService.Heartbeat:Connect(function()
                 local hrp = Character and Character:FindFirstChild("HumanoidRootPart")
-                if hrp and ShouldSpoof(hrp) then
+                if hrp and ShouldSpoofGS(hrp) then
                     hrp.CFrame *= CFrame.new(0, 3, 0)
                     RunService.RenderStepped:Wait()
                     hrp.CFrame *= CFrame.new(0, -3, 0)
@@ -2532,7 +2480,6 @@ FloorsGarden:AddToggle('AntiGroundskeeper', {
     end
 })
 
--- [TPLAYS] Invisible Grumbles (Garden)
 local InvisGrumbles = false
 FloorsGarden:AddToggle('InvisibleGrumbles', {
     Text = 'Invisible Grumbles', Default = false,
@@ -2565,7 +2512,7 @@ FloorsGarden:AddToggle('InvisibleGrumbles', {
     end
 })
 
--- ─── RIPPLE / SEASONAL ───
+-- ─── RIPPLE ───
 FloorsRipple:AddButton({
     Text = "Auto Complete Cringle", DoubleClick = false,
     Tooltip = "Instantly completes the Cringle quest (Ripple floor only).",
