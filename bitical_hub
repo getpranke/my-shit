@@ -182,6 +182,10 @@ FloorsBackdoor   = Tabs.Floor:AddLeftGroupbox('Backdoor')
 FloorsGarden     = Tabs.Floor:AddLeftGroupbox('Garden')
 FloorsRipple     = Tabs.Floor:AddLeftGroupbox('Ripple / Seasonal')
 
+-- NEW floor groupboxes
+FloorsArchives   = Tabs.Floor:AddLeftGroupbox('Archives')
+FloorsStairwell  = Tabs.Floor:AddLeftGroupbox('Stairwell')
+
 FloorsHardMode   = Tabs.Floor:AddRightGroupbox('Super Hard Mode')
 FloorsModifiers  = Tabs.Floor:AddRightGroupbox('Modifiers')
 FloorsFarm       = Tabs.Floor:AddRightGroupbox("Farming")
@@ -190,7 +194,7 @@ SettingsBox = Tabs.UISettings:AddLeftGroupbox('UI', 'wrench')
 
 Tabs.Homepage:UpdateWarningBox({
     Title = "Changelog:",
-    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Fixed Anti Jamming\nFixed UI style LinoriaLib\nImproved fake death\n+ Abysall & Tplays features\n+ Floor-sorted layout\n+ Show Current Floor button</font>",
+    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Fixed Anti Jamming\nFixed UI style LinoriaLib\nImproved fake death\n+ Abysall & Tplays features\n+ Floor-sorted layout\n+ Show Current Floor button\n+ Archives & Stairwell features</font>",
     IsNormal = true, Visible = true, LockSize = true,
 })
 
@@ -235,6 +239,9 @@ local floorVisibilityMap = {
     ["Garden"]     = { FloorsGarden },
     ["Ripple"]     = { FloorsRipple },
     ["Party"]      = { FloorsRipple },
+    ["TheArchives"]= { FloorsArchives },
+    ["Archives"]   = { FloorsArchives },
+    ["Stairwell"]  = { FloorsStairwell },
 }
 
 local function updateFloorVisibility()
@@ -242,7 +249,7 @@ local function updateFloorVisibility()
     local visibleSet = floorVisibilityMap[current] or {}
     local visibleLookup = {}
     for _, g in ipairs(visibleSet) do visibleLookup[g] = true end
-    for _, g in ipairs({ FloorsHotel, FloorsMines, FloorsRooms, FloorsBackdoor, FloorsGarden, FloorsRipple }) do
+    for _, g in ipairs({ FloorsHotel, FloorsMines, FloorsRooms, FloorsBackdoor, FloorsGarden, FloorsRipple, FloorsArchives, FloorsStairwell }) do
         setGroupboxVisible(g, visibleLookup[g] == true)
     end
 end
@@ -273,7 +280,7 @@ User:AddButton({
 })
 Info:AddLabel("[<font color=\"rgb(73,230,133)\">????</font>] LEAKER")
 
--- ⭐ [FLOOR NAME BUTTON] — shows current floor in a notification
+-- ⭐ [FLOOR NAME BUTTON]
 Info:AddDivider()
 Info:AddButton({
     Text = "Show Current Floor",
@@ -333,13 +340,11 @@ end
 if Floor:IsA("StringValue") then table.insert(Connections, Floor.Changed:Connect(updateLadderSpeedSlider)) end
 updateLadderSpeedSlider()
 
--- [TPLAYS] Walk Speed slider (0-75)
 local tplaysWalkspeed = 15
 Movement:AddSlider("TplaysWalkSpeed", {
     Text = "Tplays Walk Speed", Default = 15, Min = 0, Max = 75, Rounding = 0, Compact = true,
     Callback = function(ws) tplaysWalkspeed = ws end,
 })
--- [TPLAYS] Ladder Speed slider (0-75)
 local tplaysLadderspeed = 15
 Movement:AddSlider("TplaysLadderSpeed", {
     Text = "Tplays Ladder Speed", Default = 15, Min = 0, Max = 75, Rounding = 0, Compact = true,
@@ -449,7 +454,6 @@ Toggles.Noclip:OnChanged(function(Value)
     end
 end)
 
--- Fly
 Fly = Fly or {}
 Fly.Enabled = false; Fly.Speed = 15
 local renderConn; charAddedConn = nil
@@ -971,7 +975,6 @@ Bypass:AddSlider("SpeedBypassInternal", {
 })
 Bypass:AddDivider()
 
--- Position Spoof (GodMode)
 local GodModeCameraHandler = { enabled = false }
 local function GodModeCameraStep()
     if not GodModeCameraHandler.enabled then return end
@@ -1020,7 +1023,6 @@ Toggles.CrouchSpoof:OnChanged(function(Value)
 end)
 Bypass:AddDivider()
 
--- [TPLAYS] Position Offset Alt
 local cogAlt = false
 local slideSH = false
 local noSpread = false
@@ -1083,7 +1085,6 @@ Bypass:AddToggle('CollisionOffsetGodmodeAlt', {
     Text = "Position Offset Alt", Default = "U", Mode = "Toggle", SyncToggleState = true
 })
 
--- [TPLAYS] NoSpread / FastThrow
 Bypass:AddToggle('NoSpread', {
     Text = 'No Spread', Default = false,
     Tooltip = 'Accurate prop throw',
@@ -1100,7 +1101,6 @@ Bypass:AddToggle('FastThrow', {
 })
 Bypass:AddDivider()
 
--- [TPLAYS] Slide SpeedHack
 local walkspeed = 15
 local ladderspeed = 15
 
@@ -1147,7 +1147,6 @@ Bypass:AddSlider("TplaysLadderSpeedHack", {
 })
 Bypass:AddDivider()
 
--- ⭐ ANTICHEAT MANIPULATION — only toggle + keybind
 AnticheatManipulationLoop = nil
 AnticheatManipulationOrigin = nil
 AnticheatManipulationEnabled = false
@@ -1214,7 +1213,6 @@ Bypass:AddToggle('UseToolsAnyWhere', {
     Callback = function(Value) RequiredMainGame.canUseItems = Value end
 })
 
--- Infinite items
 local Disable3 = false
 local Prompt = Instance.new("ProximityPrompt", workspace); Prompt.Name = "TestPrompt"
 pcall(function() return fireproximityprompt(Prompt) end); Prompt:Destroy()
@@ -1483,7 +1481,6 @@ task.spawn(function()
     end
 end)
 
--- Figure Godmode (Floors 1 & 2)
 ExploitsUniversal:AddToggle('FigureGodmode', {
     Text = "Figure Godmode (Floors 1 & 2)", Default = false,
     Tooltip = "Prevents 'Figure' from hurting you on Hotel and Mines floors."
@@ -1553,7 +1550,6 @@ ExploitsUniversal:AddToggle('AntiSeekingWall', {
         end
     end
 })
--- [TPLAYS] Hiding Room Notify
 ExploitsUniversal:AddToggle('HidingRoomNotify', {
     Text = "Hiding Room Notify", Default = false,
     Tooltip = "May predict when Rush or Ambush will spawn.",
@@ -2043,7 +2039,7 @@ Effect:AddToggle('ReplaceGLwG', {
 })
 
 -- ═══════════════════════════════════════════════════════════════
--- FLOORS TAB
+-- FLOORS TAB — FLOOR-SPECIFIC FEATURES
 -- ═══════════════════════════════════════════════════════════════
 
 -- ─── HOTEL / FOOLS ───
@@ -2085,7 +2081,7 @@ FloorsHotel:AddToggle('CurrentHideTime', {
     end
 })
 
--- ─── MINES ───
+-- ─── MINES (FLOOR 2) ───
 FloorsMines:AddToggle('AutoAnchorSolver', { Text = "Auto Solve Anchors", Default = false })
 FloorsMines:AddToggle('AutoSteerMinecart', { Text = "Auto Steer Minecart", Default = false })
 FloorsMines:AddSlider("AutoSteerMinecartTurnDistance", { Text = "Turn Distance", Default = 30, Min = 20, Max = 40, Rounding = 0, Compact = true })
@@ -2512,7 +2508,7 @@ FloorsGarden:AddToggle('InvisibleGrumbles', {
     end
 })
 
--- ─── RIPPLE ───
+-- ─── RIPPLE / SEASONAL ───
 FloorsRipple:AddButton({
     Text = "Auto Complete Cringle", DoubleClick = false,
     Tooltip = "Instantly completes the Cringle quest (Ripple floor only).",
@@ -2520,6 +2516,812 @@ FloorsRipple:AddButton({
         local touch = workspace:FindFirstChild("RippleExitDoor", true)
         if touch and LocalPlayer.Character then LocalPlayer.Character:PivotTo(touch:GetPivot()) end
     end,
+})
+
+-- ═══════════════════════════════════════════════════════════════
+-- ARCHIVES FLOOR
+-- ═══════════════════════════════════════════════════════════════
+
+-- ─── [ARCHIVES] Auto Loot Lockers ───
+local ArchivesLockerRunning = false
+local ArchivesLockers = {}
+local ArchivesLockerDelay = 0.8
+
+local function Archives_validLocker(obj)
+    return obj:IsA("Model") and obj.Name:match("^HidingSpot%d+$") ~= nil
+end
+local function Archives_watch(obj)
+    if Archives_validLocker(obj) then ArchivesLockers[obj] = 0 end
+end
+
+for _, obj in workspace:GetDescendants() do Archives_watch(obj) end
+table.insert(Connections, workspace.DescendantAdded:Connect(Archives_watch))
+table.insert(Connections, workspace.DescendantRemoving:Connect(function(obj)
+    ArchivesLockers[obj] = nil
+end))
+
+local function Archives_tryLoot(obj, hrp, now)
+    if not obj.Parent then
+        ArchivesLockers[obj] = nil
+        return
+    end
+    local prompt = obj:FindFirstChild("InteractPrompt", true)
+    if not prompt or not prompt:IsA("ProximityPrompt") then return end
+    if prompt.ActionText ~= "Loot" or not prompt.Enabled then
+        ArchivesLockers[obj] = 0
+        return
+    end
+    local dist = (hrp.Position - obj:GetPivot().Position).Magnitude
+    if dist > prompt.MaxActivationDistance then
+        ArchivesLockers[obj] = 0
+        return
+    end
+    if now - ArchivesLockers[obj] < ArchivesLockerDelay then return end
+    ArchivesLockers[obj] = now
+    pcall(fireproximityprompt, prompt)
+end
+
+local function Archives_update()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local now = os.clock()
+    for obj in ArchivesLockers do
+        Archives_tryLoot(obj, hrp, now)
+    end
+end
+
+local function Archives_start()
+    if ArchivesLockerRunning then return end
+    ArchivesLockerRunning = true
+    while ArchivesLockerRunning do
+        Archives_update()
+        task.wait(0.05)
+    end
+end
+
+local function Archives_stop()
+    ArchivesLockerRunning = false
+    for obj in ArchivesLockers do ArchivesLockers[obj] = 0 end
+end
+
+FloorsArchives:AddToggle('ArchivesLockerAutoloot', {
+    Text = "Archives Locker Autoloot",
+    Tooltip = "Automatically loots nearby Archives lockers (HidingSpot# models with Loot prompt).",
+    Default = false,
+    Callback = function(value)
+        if value then task.spawn(Archives_start)
+        else Archives_stop() end
+    end
+})
+FloorsArchives:AddSlider("ArchivesLockerCooldown", {
+    Text = "Loot Attempt Cooldown",
+    Tooltip = "Delay between loot attempts.",
+    Min = 0.01, Max = 5, Default = 0.8, Rounding = 2, Compact = true,
+    Callback = function(value) ArchivesLockerDelay = value end
+})
+
+-- ─── [ARCHIVES] Honcho ESP (Color-coded Boxes + Terminals) ───
+local HonchoESPEnabled = false
+local HonchoBossActive = false
+local HonchoBossDefeated = false
+local HonchoCurrentRooms = nil
+local HonchoStages = {}
+local HonchoConnections = {}
+local HONCHO_SAFETY_INTERVAL = 5
+local HONCHO_DELIVERY_DISTANCE = 10
+local HONCHO_COLORS = {
+    Color3.fromRGB(0, 255, 0), Color3.fromRGB(0, 170, 255),
+    Color3.fromRGB(180, 80, 255), Color3.fromRGB(255, 150, 0),
+    Color3.fromRGB(255, 60, 60),
+}
+local HONCHO_OUTLINE = Color3.fromRGB(255, 255, 255)
+
+local function Honcho_disconnectAll()
+    for _, c in ipairs(HonchoConnections) do
+        if c then pcall(function() c:Disconnect() end) end
+    end
+    table.clear(HonchoConnections)
+end
+local function Honcho_connect(signal, callback)
+    local c = signal:Connect(callback)
+    table.insert(HonchoConnections, c)
+    return c
+end
+local function Honcho_getBoxLabel(box)
+    local h = box:FindFirstChild("Handle"); if not h then return end
+    local lf = h:FindFirstChild("Label"); if not lf then return end
+    local tf = lf:FindFirstChild("Text"); if not tf then return end
+    local l = tf:FindFirstChild("Label")
+    if l and l:IsA("TextLabel") then return l end
+end
+local function Honcho_getTerminalLabel(terminal)
+    local s = terminal:FindFirstChild("Screen"); if not s then return end
+    local tf = s:FindFirstChild("Text"); if not tf then return end
+    local l = tf:FindFirstChild("Label")
+    if l and l:IsA("TextLabel") then return l end
+end
+local function Honcho_getWorldPosition(o)
+    if not o then return end
+    if o:IsA("BasePart") then return o.Position end
+    if o:IsA("Model") then
+        if o.PrimaryPart then return o.PrimaryPart.Position end
+        return o:GetPivot().Position
+    end
+end
+local function Honcho_isValidTarget(t)
+    return t and t ~= "" and t ~= "---" and string.match(t, "^%u%-%d+$") ~= nil
+end
+local function Honcho_applyHighlight(object, color, name)
+    if not object or not object.Parent then return end
+    local h = object:FindFirstChild(name)
+    if not h or not h:IsA("Highlight") then
+        h = Instance.new("Highlight")
+        h.Name = name
+        h.FillTransparency = 0.3
+        h.OutlineTransparency = 0
+        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        h.Parent = object
+    end
+    h.FillColor = color
+    h.OutlineColor = HONCHO_OUTLINE
+end
+local function Honcho_removeHighlight(object, name)
+    if not object then return end
+    local h = object:FindFirstChild(name)
+    if h then h:Destroy() end
+end
+local function Honcho_clearAllHighlights()
+    for _, stageData in pairs(HonchoStages) do
+        for t in pairs(stageData.terminals) do
+            if t and t.Parent then Honcho_removeHighlight(t, "HonchoTerminalESP") end
+        end
+        for b in pairs(stageData.boxes) do
+            if b and b.Parent then Honcho_removeHighlight(b, "HonchoBoxESP") end
+        end
+    end
+end
+local function Honcho_getStageForObject(object)
+    if not HonchoCurrentRooms or not object then return end
+    local current = object
+    while current and current.Parent ~= HonchoCurrentRooms do current = current.Parent end
+    if current and current.Parent == HonchoCurrentRooms then return current end
+end
+local function Honcho_getOrCreateStage(stage)
+    if not stage then return end
+    if HonchoStages[stage] then return HonchoStages[stage] end
+    HonchoStages[stage] = { terminals = {}, boxes = {} }
+    return HonchoStages[stage]
+end
+local function Honcho_refreshStageTargets(stage)
+    local s = HonchoStages[stage]; if not s then return end
+    local list = {}
+    for terminal, data in pairs(s.terminals) do
+        if terminal and terminal.Parent then
+            table.insert(list, terminal)
+            if data.label and data.label.Parent then
+                if Honcho_isValidTarget(data.label.Text) then data.target = data.label.Text
+                else data.target = nil end
+            else data.target = nil end
+        else s.terminals[terminal] = nil end
+    end
+    table.sort(list, function(a, b) return a:GetFullName() < b:GetFullName() end)
+    for i, t in ipairs(list) do
+        local d = s.terminals[t]
+        local ci = math.min(i, #HONCHO_COLORS)
+        d.colorIndex = ci; d.color = HONCHO_COLORS[ci]
+        if HonchoESPEnabled and not HonchoBossDefeated then
+            Honcho_applyHighlight(t, d.color, "HonchoTerminalESP")
+        end
+    end
+end
+local function Honcho_findTerminal(stage, target)
+    local s = HonchoStages[stage]; if not s then return end
+    for t, d in pairs(s.terminals) do
+        if d.target == target then return t end
+    end
+end
+local function Honcho_assignBox(box, stage)
+    local s = HonchoStages[stage]; if not s then return end
+    local d = s.boxes[box]; if not d then return end
+    if d.terminal and d.terminal.Parent and d.target and d.color then
+        if HonchoESPEnabled and not HonchoBossDefeated then
+            Honcho_applyHighlight(box, d.color, "HonchoBoxESP")
+        end
+        return
+    end
+    local label = Honcho_getBoxLabel(box); if not label then return end
+    local number = label.Text
+    if not Honcho_isValidTarget(number) then return end
+    local terminal = Honcho_findTerminal(stage, number); if not terminal then return end
+    local td = s.terminals[terminal]; if not td then return end
+    d.target = number; d.terminal = terminal
+    d.colorIndex = td.colorIndex; d.color = td.color
+    Honcho_applyHighlight(box, d.color, "HonchoBoxESP")
+end
+local function Honcho_addBox(box)
+    if not HonchoESPEnabled or not box:IsA("Model") then return end
+    local stage = Honcho_getStageForObject(box); if not stage then return end
+    local s = Honcho_getOrCreateStage(stage); if s.boxes[box] then return end
+    s.boxes[box] = { target = nil, terminal = nil, colorIndex = nil, color = nil }
+    local label = Honcho_getBoxLabel(box)
+    if label then
+        Honcho_connect(label:GetPropertyChangedSignal("Text"), function()
+            if HonchoESPEnabled and box.Parent then Honcho_assignBox(box, stage) end
+        end)
+    end
+    Honcho_assignBox(box, stage)
+    task.delay(0.15, function()
+        if HonchoESPEnabled and box.Parent and s.boxes[box] then Honcho_assignBox(box, stage) end
+    end)
+end
+local function Honcho_removeBox(box, stage)
+    local s = HonchoStages[stage]; if not s then return end
+    Honcho_removeHighlight(box, "HonchoBoxESP")
+    s.boxes[box] = nil
+end
+local function Honcho_addTerminal(terminal)
+    if not HonchoESPEnabled then return end
+    if terminal.Name ~= "ArchivesPackageDeposit" then return end
+    local stage = Honcho_getStageForObject(terminal); if not stage then return end
+    local s = Honcho_getOrCreateStage(stage); if s.terminals[terminal] then return end
+    local label = Honcho_getTerminalLabel(terminal)
+    if not label then
+        task.delay(0.15, function()
+            if HonchoESPEnabled and terminal and terminal.Parent then Honcho_addTerminal(terminal) end
+        end)
+        return
+    end
+    s.terminals[terminal] = { label = label, target = nil, colorIndex = 1, color = HONCHO_COLORS[1] }
+    Honcho_connect(label:GetPropertyChangedSignal("Text"), function()
+        if not HonchoESPEnabled then return end
+        Honcho_refreshStageTargets(stage)
+        local cs = HonchoStages[stage]; if not cs then return end
+        for box in pairs(cs.boxes) do
+            if box and box.Parent then Honcho_assignBox(box, stage) end
+        end
+    end)
+    Honcho_refreshStageTargets(stage)
+    for box in pairs(s.boxes) do
+        if box and box.Parent then Honcho_assignBox(box, stage) end
+    end
+end
+local function Honcho_removeTerminal(terminal, stage)
+    local s = HonchoStages[stage]; if not s then return end
+    Honcho_removeHighlight(terminal, "HonchoTerminalESP")
+    s.terminals[terminal] = nil
+    Honcho_refreshStageTargets(stage)
+end
+local function Honcho_scanStage(stage)
+    if not stage then return end
+    local s = Honcho_getOrCreateStage(stage)
+    for _, obj in ipairs(stage:GetDescendants()) do
+        if obj.Name == "ArchivesPackageDeposit" then Honcho_addTerminal(obj)
+        elseif obj.Name == "ArchivesStorageBox" and obj:IsA("Model") then Honcho_addBox(obj) end
+    end
+    Honcho_refreshStageTargets(stage)
+    for box in pairs(s.boxes) do
+        if box and box.Parent then Honcho_assignBox(box, stage) end
+    end
+end
+local function Honcho_scanAllStages()
+    if not HonchoCurrentRooms then return end
+    for _, stage in ipairs(HonchoCurrentRooms:GetChildren()) do Honcho_scanStage(stage) end
+end
+local function Honcho_isBoxAtTerminal(box, terminal)
+    if not box or not box.Parent then return true end
+    if not terminal or not terminal.Parent then return false end
+    local bp = Honcho_getWorldPosition(box); local tp = Honcho_getWorldPosition(terminal)
+    if not bp or not tp then return false end
+    return (bp - tp).Magnitude <= HONCHO_DELIVERY_DISTANCE
+end
+local function Honcho_checkDeliveries()
+    if not HonchoESPEnabled or HonchoBossDefeated then return end
+    for stage, s in pairs(HonchoStages) do
+        for box, d in pairs(s.boxes) do
+            if not box or not box.Parent then
+                Honcho_removeHighlight(box, "HonchoBoxESP"); s.boxes[box] = nil
+            elseif d.terminal and d.terminal.Parent then
+                if Honcho_isBoxAtTerminal(box, d.terminal) then
+                    Honcho_removeHighlight(box, "HonchoBoxESP"); s.boxes[box] = nil
+                end
+            end
+        end
+    end
+end
+local function Honcho_safetyRescan()
+    if not HonchoESPEnabled or HonchoBossDefeated then return end
+    Honcho_scanAllStages()
+    for _, s in pairs(HonchoStages) do
+        for t, d in pairs(s.terminals) do
+            if t and t.Parent and d.color then Honcho_applyHighlight(t, d.color, "HonchoTerminalESP") end
+        end
+        for b, d in pairs(s.boxes) do
+            if b and b.Parent and d.terminal and d.color then Honcho_applyHighlight(b, d.color, "HonchoBoxESP") end
+        end
+    end
+end
+local function Honcho_isBossAlive()
+    if not LocalPlayer then return false end
+    local gui = LocalPlayer:FindFirstChild("PlayerGui")
+    if gui then
+        if gui:FindFirstChild("BossHealthBar", true) or gui:FindFirstChild("HonchoIndicator", true) then return true end
+    end
+    local h = workspace:FindFirstChild("Honcho")
+    return h ~= nil and h:IsA("Model")
+end
+local function Honcho_cleanupStages()
+    for stage, s in pairs(HonchoStages) do
+        if not stage or not stage.Parent then
+            for t in pairs(s.terminals) do Honcho_removeHighlight(t, "HonchoTerminalESP") end
+            for b in pairs(s.boxes) do Honcho_removeHighlight(b, "HonchoBoxESP") end
+            HonchoStages[stage] = nil
+        end
+    end
+end
+local function Honcho_setupListeners()
+    if not HonchoCurrentRooms then return end
+    Honcho_connect(HonchoCurrentRooms.ChildAdded, function(stage)
+        if not HonchoESPEnabled then return end
+        task.delay(0.1, function()
+            if HonchoESPEnabled and stage and stage.Parent == HonchoCurrentRooms then Honcho_scanStage(stage) end
+        end)
+    end)
+    Honcho_connect(HonchoCurrentRooms.DescendantAdded, function(obj)
+        if not HonchoESPEnabled then return end
+        if obj.Name == "ArchivesStorageBox" and obj:IsA("Model") then Honcho_addBox(obj)
+        elseif obj.Name == "ArchivesPackageDeposit" then Honcho_addTerminal(obj) end
+    end)
+    Honcho_connect(HonchoCurrentRooms.DescendantRemoving, function(obj)
+        local stage = Honcho_getStageForObject(obj); if not stage then return end
+        local s = HonchoStages[stage]; if not s then return end
+        if s.boxes[obj] then Honcho_removeBox(obj, stage)
+        elseif s.terminals[obj] then Honcho_removeTerminal(obj, stage) end
+    end)
+end
+local function Honcho_startESP()
+    Honcho_disconnectAll()
+    table.clear(HonchoStages)
+    HonchoBossActive = false; HonchoBossDefeated = false
+    HonchoCurrentRooms = workspace:FindFirstChild("CurrentRooms")
+    if not HonchoCurrentRooms then
+        Library:Notify("CurrentRooms not found (Honcho ESP)", 3); return
+    end
+    Honcho_scanAllStages()
+    Honcho_setupListeners()
+    task.spawn(function()
+        while HonchoESPEnabled do
+            local alive = Honcho_isBossAlive()
+            if alive then HonchoBossActive = true
+            elseif HonchoBossActive then
+                HonchoBossActive = false; HonchoBossDefeated = true
+                Honcho_clearAllHighlights(); break
+            end
+            Honcho_checkDeliveries()
+            Honcho_cleanupStages()
+            task.wait(HONCHO_SAFETY_INTERVAL)
+            if HonchoESPEnabled and not HonchoBossDefeated then Honcho_safetyRescan() end
+        end
+    end)
+end
+local function Honcho_stopESP()
+    Honcho_clearAllHighlights()
+    Honcho_disconnectAll()
+    table.clear(HonchoStages)
+    HonchoCurrentRooms = nil
+    HonchoBossActive = false; HonchoBossDefeated = false
+end
+
+FloorsArchives:AddToggle('HonchoESPToggle', {
+    Text = "Honcho ESP",
+    Tooltip = "Color-coded ESP for Archives boxes and terminals",
+    Default = false,
+    Callback = function(on)
+        HonchoESPEnabled = on
+        if on then Honcho_startESP() else Honcho_stopESP() end
+    end
+})
+FloorsArchives:AddButton({
+    Text = "Honcho Rescan",
+    Func = function()
+        if not HonchoESPEnabled then return end
+        Honcho_scanAllStages()
+    end
+})
+
+-- ─── [ARCHIVES] Water Cooler Autodrink ───
+local ArchivesCoolerBusy = false
+local ArchivesCoolerDelay = 0.5
+local ArchivesCoolerCupTimeout = 1
+local ArchivesCoolerDrinkTimeout = 5
+local ArchivesCoolerStepDelay = 0.15
+
+local function ArchivesCooler_promptOf(parent)
+    local p = parent and parent:FindFirstChild("InteractPrompt", true)
+    if p and p:IsA("ProximityPrompt") then return p end
+end
+local function ArchivesCooler_promptPos(p)
+    local x = p and p.Parent; if not x then return end
+    if x:IsA("Attachment") then return x.WorldPosition
+    elseif x:IsA("BasePart") then return x.Position
+    elseif x:IsA("Model") then return x:GetPivot().Position end
+    local part = p:FindFirstAncestorWhichIsA("BasePart")
+    return part and part.Position
+end
+local function ArchivesCooler_nearby(p)
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local pos = ArchivesCooler_promptPos(p)
+    return p and p.Parent and p.Enabled and hrp and pos
+        and (hrp.Position - pos).Magnitude <= p.MaxActivationDistance
+end
+local function ArchivesCooler_coolers()
+    local result = {}
+    for _, obj in workspace:GetDescendants() do
+        if obj.Name == "ArchivesWaterCooler" then
+            local cups = obj:FindFirstChild("Cups", true)
+            local cold = obj:FindFirstChild("Cold", true)
+            local hot = obj:FindFirstChild("Hot", true)
+            local cp = ArchivesCooler_promptOf(cups)
+            local fp = ArchivesCooler_promptOf(cold)
+            local hp = ArchivesCooler_promptOf(hot)
+            if cp and fp and hp and ArchivesCooler_nearby(cp) then
+                result[#result + 1] = { model = obj, cups = cp, cold = fp, hot = hp }
+            end
+        end
+    end
+    return result
+end
+local function ArchivesCooler_getCup()
+    local char = LocalPlayer.Character
+    local cup = char and char:FindFirstChild("WaterCup")
+    if cup and cup:IsA("Tool") then return cup end
+    local bag = LocalPlayer:FindFirstChildOfClass("Backpack")
+    local stored = bag and bag:FindFirstChild("WaterCup")
+    if stored and stored:IsA("Tool") then
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum:EquipTool(stored) end
+    end
+end
+local function ArchivesCooler_waitCup()
+    local t = os.clock()
+    repeat
+        local cup = ArchivesCooler_getCup()
+        if cup then return cup end
+        task.wait(0.05)
+    until os.clock() - t >= ArchivesCoolerCupTimeout
+end
+local function ArchivesCooler_use(p)
+    if not ArchivesCooler_nearby(p) then return false end
+    pcall(fireproximityprompt, p)
+    return true
+end
+local function ArchivesCooler_gone(cup)
+    local t = os.clock()
+    while cup.Parent and os.clock() - t < ArchivesCoolerDrinkTimeout do task.wait(0.05) end
+    return cup.Parent == nil
+end
+local function ArchivesCooler_drink(cooler)
+    if not ArchivesCooler_use(cooler.cups) then return false end
+    local cup = ArchivesCooler_waitCup(); if not cup then return false end
+    task.wait(ArchivesCoolerStepDelay)
+    cup = ArchivesCooler_getCup(); if not cup or not ArchivesCooler_use(cooler.cold) then return false end
+    task.wait(ArchivesCoolerStepDelay)
+    cup = ArchivesCooler_getCup(); if not cup or not ArchivesCooler_use(cooler.hot) then return false end
+    task.wait(ArchivesCoolerStepDelay)
+    cup = ArchivesCooler_getCup()
+    local remote = cup and cup:FindFirstChild("Remote")
+    if not remote or not remote:IsA("RemoteEvent") then return false end
+    remote:FireServer()
+    return ArchivesCooler_gone(cup)
+end
+FloorsArchives:AddButton({
+    Text = "Water Cooler Autodrink",
+    Tooltip = "Auto cup + fill + drink loop. Stops when no coolers nearby.",
+    Func = function()
+        if ArchivesCoolerBusy then return end
+        ArchivesCoolerBusy = true
+        task.spawn(function()
+            while true do
+                local list = ArchivesCooler_coolers()
+                if #list == 0 then break end
+                local ok = false
+                for _, cooler in ipairs(list) do
+                    if ArchivesCooler_drink(cooler) then ok = true break end
+                end
+                if not ok then break end
+                task.wait(ArchivesCoolerDelay)
+            end
+            ArchivesCoolerBusy = false
+        end)
+    end,
+})
+FloorsArchives:AddSlider("ArchivesWaterCoolerCooldown", {
+    Text = "Cooler Cycle Cooldown", Default = 0.5, Min = 0.01, Max = 5, Rounding = 2, Compact = true,
+    Callback = function(v) ArchivesCoolerDelay = v end,
+})
+
+FloorsArchives:AddDivider()
+FloorsArchives:AddLabel({ Text = "Matching boxes and terminals share the same color.", DoesWrap = true })
+
+-- ═══════════════════════════════════════════════════════════════
+-- STAIRWELL FLOOR
+-- ═══════════════════════════════════════════════════════════════
+
+local SW_StairwellEnabled = false
+local SW_CartEnabled = false
+local SW_TVStandEnabled = false
+local SW_FireAlarmEnabled = false
+
+local SW_trackedStairwell = {}
+local SW_trackedCarts = {}
+local SW_trackedTVStands = {}
+local SW_trackedFireAlarms = {}
+local SW_connections = {}
+
+local SW_STAIRWELL_FILL = Color3.fromRGB(80, 200, 255)
+local SW_CART_FILL      = Color3.fromRGB(0, 45, 160)
+local SW_TVSTAND_FILL   = Color3.fromRGB(255, 170, 0)
+local SW_FIREALARM_FILL = Color3.fromRGB(255, 50, 50)
+local SW_OUTLINE        = Color3.fromRGB(255, 255, 255)
+
+local function SW_getRootPart()
+    local character = LocalPlayer.Character
+    if not character then return nil end
+    return character:FindFirstChild("HumanoidRootPart")
+end
+local function SW_getAdornee(object)
+    if object:IsA("BasePart") or object:IsA("Model") then return object end
+end
+local function SW_getCartItemCount(cart)
+    local stored = cart:FindFirstChild("StoredItems")
+    if not stored then return 0 end
+    return #stored:GetChildren()
+end
+local function SW_CreateESP(object, color, trackedTable)
+    if not object or not object.Parent then return end
+    if trackedTable[object] then return end
+    local adornee = SW_getAdornee(object); if not adornee then return end
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "CheesyESP"
+    highlight.Adornee = adornee
+    highlight.FillColor = color
+    highlight.FillTransparency = 0.45
+    highlight.OutlineColor = SW_OUTLINE
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = object
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "CheesyESPLabel"
+    billboard.Adornee = adornee
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.fromOffset(180, 54)
+    billboard.StudsOffset = Vector3.new(0, 0, 0)
+    billboard.MaxDistance = 10000
+    billboard.Parent = object
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Text = object.Name
+    label.TextColor3 = color
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.TextStrokeTransparency = 0
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Center
+    label.TextYAlignment = Enum.TextYAlignment.Center
+    label.Parent = billboard
+    trackedTable[object] = { Highlight = highlight, Billboard = billboard, Label = label }
+end
+local function SW_RemoveESP(object, trackedTable)
+    local data = trackedTable[object]; if not data then return end
+    if data.Highlight then data.Highlight:Destroy() end
+    if data.Billboard then data.Billboard:Destroy() end
+    trackedTable[object] = nil
+end
+local function SW_ClearESP(trackedTable)
+    for object, data in pairs(trackedTable) do
+        if data.Highlight then data.Highlight:Destroy() end
+        if data.Billboard then data.Billboard:Destroy() end
+        trackedTable[object] = nil
+    end
+end
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if Library.Unloaded then break end
+        local root = SW_getRootPart(); if not root then continue end
+
+        if SW_StairwellEnabled then
+            for object, data in pairs(SW_trackedStairwell) do
+                if not object.Parent then SW_RemoveESP(object, SW_trackedStairwell)
+                else
+                    local adornee = SW_getAdornee(object)
+                    if adornee then
+                        local pos
+                        if adornee:IsA("BasePart") then pos = adornee.Position
+                        elseif adornee:IsA("Model") then pos = adornee:GetPivot().Position end
+                        if pos then
+                            local dist = (root.Position - pos).Magnitude
+                            data.Label.Text = object.Name .. "\n[" .. math.floor(dist) .. "M]"
+                        end
+                    end
+                end
+            end
+        end
+
+        if SW_CartEnabled then
+            for object, data in pairs(SW_trackedCarts) do
+                if not object.Parent then SW_RemoveESP(object, SW_trackedCarts)
+                else
+                    local adornee = SW_getAdornee(object)
+                    if adornee then
+                        local pos
+                        if adornee:IsA("BasePart") then pos = adornee.Position
+                        elseif adornee:IsA("Model") then pos = adornee:GetPivot().Position end
+                        if pos then
+                            local dist = (root.Position - pos).Magnitude
+                            local itemCount = SW_getCartItemCount(object)
+                            if itemCount > 0 then
+                                data.Label.Text = object.Name .. "\n[" .. itemCount .. " ITEMS]\n[" .. math.floor(dist) .. "M]"
+                            else
+                                data.Label.Text = object.Name .. "\n[" .. math.floor(dist) .. "M]"
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        if SW_TVStandEnabled then
+            for object, data in pairs(SW_trackedTVStands) do
+                if not object.Parent then SW_RemoveESP(object, SW_trackedTVStands)
+                else
+                    local adornee = SW_getAdornee(object)
+                    if adornee then
+                        local pos
+                        if adornee:IsA("BasePart") then pos = adornee.Position
+                        elseif adornee:IsA("Model") then pos = adornee:GetPivot().Position end
+                        if pos then
+                            local dist = (root.Position - pos).Magnitude
+                            data.Label.Text = object.Name .. "\n[" .. math.floor(dist) .. "M]"
+                        end
+                    end
+                end
+            end
+        end
+
+        if SW_FireAlarmEnabled then
+            for object, data in pairs(SW_trackedFireAlarms) do
+                if not object.Parent then SW_RemoveESP(object, SW_trackedFireAlarms)
+                else
+                    local adornee = SW_getAdornee(object)
+                    if adornee then
+                        local pos
+                        if adornee:IsA("BasePart") then pos = adornee.Position
+                        elseif adornee:IsA("Model") then pos = adornee:GetPivot().Position end
+                        if pos then
+                            local dist = (root.Position - pos).Magnitude
+                            data.Label.Text = object.Name .. "\n[" .. math.floor(dist) .. "M]"
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+local function SW_ProcessStairwell(landing)
+    if not SW_StairwellEnabled then return end
+    for _, child in ipairs(landing:GetChildren()) do
+        SW_CreateESP(child, SW_STAIRWELL_FILL, SW_trackedStairwell)
+    end
+end
+local function SW_ProcessDrops()
+    if not SW_StairwellEnabled then return end
+    local drops = workspace:FindFirstChild("Drops")
+    if not drops then return end
+    for _, object in ipairs(drops:GetChildren()) do
+        SW_CreateESP(object, SW_STAIRWELL_FILL, SW_trackedStairwell)
+    end
+end
+local function SW_ScanStairwells()
+    for _, object in ipairs(workspace:GetDescendants()) do
+        if object:IsA("Model") and object.Name == "StairwellLandingLogic" then
+            SW_ProcessStairwell(object)
+        end
+    end
+end
+local function SW_ScanCarts()
+    if not SW_CartEnabled then return end
+    for _, object in ipairs(workspace:GetDescendants()) do
+        if object.Name == "ShoppingCart" then SW_CreateESP(object, SW_CART_FILL, SW_trackedCarts) end
+    end
+end
+local function SW_ScanTVStands()
+    if not SW_TVStandEnabled then return end
+    for _, object in ipairs(workspace:GetDescendants()) do
+        if object.Name == "TV_Stand" then SW_CreateESP(object, SW_TVSTAND_FILL, SW_trackedTVStands) end
+    end
+end
+local function SW_ScanFireAlarms()
+    if not SW_FireAlarmEnabled then return end
+    for _, object in ipairs(workspace:GetDescendants()) do
+        if object.Name == "StairwellFireAlarm" then SW_CreateESP(object, SW_FIREALARM_FILL, SW_trackedFireAlarms) end
+    end
+end
+local function SW_ConnectWorkspace()
+    if SW_connections.WorkspaceAdded then SW_connections.WorkspaceAdded:Disconnect() end
+    SW_connections.WorkspaceAdded = workspace.DescendantAdded:Connect(function(object)
+        if SW_StairwellEnabled then
+            if object:IsA("Model") and object.Name == "StairwellLandingLogic" then
+                task.defer(function()
+                    if object.Parent then SW_ProcessStairwell(object) end
+                end)
+            end
+            local parent = object.Parent
+            if parent and parent:IsA("Model") and parent.Name == "StairwellLandingLogic" then
+                SW_CreateESP(object, SW_STAIRWELL_FILL, SW_trackedStairwell)
+            end
+            local drops = workspace:FindFirstChild("Drops")
+            if drops and object.Parent == drops then
+                SW_CreateESP(object, SW_STAIRWELL_FILL, SW_trackedStairwell)
+            end
+        end
+        if SW_CartEnabled and object.Name == "ShoppingCart" then SW_CreateESP(object, SW_CART_FILL, SW_trackedCarts) end
+        if SW_TVStandEnabled and object.Name == "TV_Stand" then SW_CreateESP(object, SW_TVSTAND_FILL, SW_trackedTVStands) end
+        if SW_FireAlarmEnabled and object.Name == "StairwellFireAlarm" then SW_CreateESP(object, SW_FIREALARM_FILL, SW_trackedFireAlarms) end
+    end)
+end
+
+FloorsStairwell:AddToggle("StairwellLandingESP", {
+    Text = "Stairwell Items ESP",
+    Tooltip = "Highlights StairwellLandingLogic items + drops",
+    Default = false,
+    Callback = function(on)
+        SW_StairwellEnabled = on
+        if on then SW_ScanStairwells() SW_ProcessDrops()
+        else SW_ClearESP(SW_trackedStairwell) end
+        SW_ConnectWorkspace()
+    end
+})
+FloorsStairwell:AddToggle("CartESP", {
+    Text = "Cart ESP",
+    Tooltip = "Highlights all ShoppingCart objects (shows stored item count)",
+    Default = false,
+    Callback = function(on)
+        SW_CartEnabled = on
+        if on then SW_ScanCarts()
+        else SW_ClearESP(SW_trackedCarts) end
+        SW_ConnectWorkspace()
+    end
+})
+FloorsStairwell:AddToggle("TVStandESP", {
+    Text = "TV Stand ESP",
+    Tooltip = "Highlights all TV_Stand objects",
+    Default = false,
+    Callback = function(on)
+        SW_TVStandEnabled = on
+        if on then SW_ScanTVStands()
+        else SW_ClearESP(SW_trackedTVStands) end
+        SW_ConnectWorkspace()
+    end
+})
+FloorsStairwell:AddToggle("FireAlarmESP", {
+    Text = "Fire Alarm ESP",
+    Tooltip = "Highlights all StairwellFireAlarm objects",
+    Default = false,
+    Callback = function(on)
+        SW_FireAlarmEnabled = on
+        if on then SW_ScanFireAlarms()
+        else SW_ClearESP(SW_trackedFireAlarms) end
+        SW_ConnectWorkspace()
+    end
+})
+FloorsStairwell:AddDivider()
+FloorsStairwell:AddLabel({
+    Text = "Stairwell = Cyan\nCart = Deep Blue\nTV Stand = Orange\nFire Alarm = Red\nCart shows stored item count",
+    DoesWrap = true,
 })
 
 -- ─── SUPER HARD MODE ───
@@ -2779,10 +3581,17 @@ function Unload()
         "DoorSkipper","DisableMinesEcho","CollisionOffsetGodmodeAlt","NoSpread","FastThrow",
         "SlideSpeedHack","Freecam","NoWardrobeVignette","RemoveAmbience","ReplaceGLwG",
         "CurrentHideTime","HidingRoomNotify","InvisibleGrumbles","AntiGroundskeeper","ThinkingAnimation",
-        "AnticheatManipulation"
+        "AnticheatManipulation",
+        "ArchivesLockerAutoloot","HonchoESPToggle","StairwellLandingESP","CartESP","TVStandESP","FireAlarmESP"
     }) do
         if Toggles[name] then pcall(function() Toggles[name]:SetValue(false) end) end
     end
+    pcall(function() Archives_stop() end)
+    pcall(function() Honcho_stopESP() end)
+    SW_StairwellEnabled = false; SW_CartEnabled = false; SW_TVStandEnabled = false; SW_FireAlarmEnabled = false
+    SW_ClearESP(SW_trackedStairwell); SW_ClearESP(SW_trackedCarts)
+    SW_ClearESP(SW_trackedTVStands); SW_ClearESP(SW_trackedFireAlarms)
+
     if FakeSurge then FakeSurge:Destroy() end
     if ReplicatedStorage:FindFirstChild("SurgeRemote") then
         ReplicatedStorage.SurgeRemote.Parent = ReplicatedStorage.RemotesFolder
