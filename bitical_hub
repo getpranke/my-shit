@@ -3,7 +3,7 @@
     ║              BITICAL HUB - ULTIMATE EDITION                       ║
     ║                       by INNERCOME                                ║
     ║     New into these things, glad the templates exist :)            ║
-    ║                    Powered by Obsidian                            ║
+    ║                   Powered by Obsidian (same as Bitical)           ║
     ╚═══════════════════════════════════════════════════════════════════╝
 ]]
 
@@ -41,15 +41,18 @@ LocalPlayer:SetAttribute("BiticalLoaded", true)
 repeat task.wait() until LocalPlayer.Character
 
 -- ═══════════════════════════════════════════════════════════════
--- LIBRARIES (Obsidian)
+-- LIBRARIES (SAME AS ORIGINAL BITICAL HUB)
 -- ═══════════════════════════════════════════════════════════════
 
-local repo = "https://raw.githubusercontent.com/mstudio45/Obsidian/main/"
+local repo = 'https://raw.githubusercontent.com/mstudio45/Obsidian/main/'
 
-local Library       = loadstring(game:HttpGet(repo .. "Library.lua"))()
-local ThemeManager  = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
-local SaveManager   = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
-local ESPLibrary    = loadstring(game:HttpGet("https://raw.githubusercontent.com/TheHunterSolo1/Scripts/main/ESPLibrary"))()
+local Library      = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager  = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local ESPLibrary   = loadstring(game:HttpGet("https://raw.githubusercontent.com/mstudio45/MSESP/refs/heads/main/source.luau"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
 
 -- ═══════════════════════════════════════════════════════════════
 -- GAME REFERENCES
@@ -332,7 +335,7 @@ local function SetStatsVisible(value)
 end
 
 -- ═══════════════════════════════════════════════════════════════
--- CREATE WINDOW (OBSIDIAN)
+-- CREATE WINDOW (OBSIDIAN — SAME AS ORIGINAL BITICAL)
 -- ═══════════════════════════════════════════════════════════════
 
 local Window = Library:CreateWindow({
@@ -356,9 +359,6 @@ local Tabs = {
     Settings = Window:AddTab("Settings", "settings"),
     Info     = Window:AddTab("Info", "info"),
 }
-
-local Options = Library.Options
-local Toggles = Library.Toggles
 
 -- ═══════════════════════════════════════════════════════════════
 -- HOME TAB
@@ -385,15 +385,6 @@ HomeUser:AddButton({
 
 HomeInfo:AddLabel("Current Floor: " .. CurrentFloor)
 HomeInfo:AddLabel("Current Room: " .. tostring(LatestRoom.Value))
-HomeInfo:AddDivider()
-HomeInfo:AddButton({
-    Text = "Refresh Info",
-    Tooltip = "Updates the floor/room info",
-    Func = function()
-        CurrentFloor = Floor.Value
-        Notify("Refreshed", "Floor: " .. CurrentFloor .. " | Room: " .. LatestRoom.Value, 3)
-    end,
-})
 
 -- ═══════════════════════════════════════════════════════════════
 -- PLAYER TAB
@@ -404,7 +395,6 @@ local ReachBox    = Tabs.Player:AddLeftGroupbox("Reach & Interaction")
 local AutoBox     = Tabs.Player:AddRightGroupbox("Auto Interact")
 local MiscBox     = Tabs.Player:AddRightGroupbox("Misc")
 
--- Movement
 MovementBox:AddSlider("SpeedSlider", {
     Text = "Walk Speed",
     Min = 15, Max = 21,
@@ -416,7 +406,7 @@ MovementBox:AddSlider("SpeedSlider", {
         if Toggles.SpeedBoost.Value and GetHumanoid() then
             GetHumanoid().WalkSpeed = Speed
         end
-    end
+    end,
 })
 
 MovementBox:AddToggle("SpeedBoost", {
@@ -425,7 +415,7 @@ MovementBox:AddToggle("SpeedBoost", {
     Callback = function(Value)
         local hum = GetHumanoid()
         if hum then hum.WalkSpeed = Value and Speed or 16 end
-    end
+    end,
 })
 
 if CurrentFloor == "Mines" then
@@ -439,7 +429,7 @@ if CurrentFloor == "Mines" then
             if Toggles.SpeedBoost.Value and GetCharacter() and GetCharacter():GetAttribute("Climbing") then
                 GetHumanoid().WalkSpeed = Speed + Value
             end
-        end
+        end,
     })
 end
 
@@ -450,7 +440,7 @@ MovementBox:AddToggle("EnableJump", {
     Default = false,
     Callback = function(Value)
         if GetCharacter() then GetCharacter():SetAttribute("CanJump", Value) end
-    end
+    end,
 })
 
 MovementBox:AddSlider("JumpPowerSlider", {
@@ -466,7 +456,7 @@ MovementBox:AddSlider("JumpPowerSlider", {
             if hum.UseJumpPower then hum.JumpPower = Value
             else hum.JumpHeight = Value end
         end
-    end
+    end,
 })
 
 MovementBox:AddToggle("InfiniteJump", {
@@ -565,7 +555,7 @@ MovementBox:AddSlider("FlySpeed", {
     Default = 20,
     Rounding = 0,
     Compact = true,
-    Callback = function(Value) Fly.Speed = Value end
+    Callback = function(Value) Fly.Speed = Value end,
 })
 
 MovementBox:AddToggle("NoAcceleration", {
@@ -577,7 +567,7 @@ MovementBox:AddToggle("NoAcceleration", {
             if Value then r.CustomPhysicalProperties = PhysicalProperties.new(100, 0.1, 0.1, 0.1, 0.1)
             else r.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1) end
         end
-    end
+    end,
 })
 
 -- Reach
@@ -595,7 +585,7 @@ ReachBox:AddToggle("PromptReach", {
                 end
             end
         end
-    end
+    end,
 })
 
 ReachBox:AddSlider("PromptReachMultiplier", {
@@ -610,7 +600,7 @@ ReachBox:AddSlider("PromptReachMultiplier", {
             Toggles.PromptReach:SetValue(false)
             Toggles.PromptReach:SetValue(true)
         end
-    end
+    end,
 })
 
 ReachBox:AddToggle("PromptClip", {
@@ -627,7 +617,7 @@ ReachBox:AddToggle("PromptClip", {
                 end
             end
         end
-    end
+    end,
 })
 
 ReachBox:AddToggle("InstantPrompt", {
@@ -644,7 +634,7 @@ ReachBox:AddToggle("InstantPrompt", {
                 end
             end
         end
-    end
+    end,
 })
 
 ReachBox:AddDivider()
@@ -660,7 +650,7 @@ ReachBox:AddSlider("DoorReachRange", {
     Default = 20,
     Rounding = 0,
     Compact = true,
-    Callback = function(Value) DoorReachRange = Value end
+    Callback = function(Value) DoorReachRange = Value end,
 })
 
 ReachBox:AddToggle("NoClosetDelay", {
@@ -765,7 +755,7 @@ BypassLeft1:AddToggle("BypassGiggle", {
                 if hb then hb.CanTouch = not Value end
             end
         end
-    end
+    end,
 })
 
 BypassLeft1:AddToggle("BypassDupe", {
@@ -783,7 +773,7 @@ BypassLeft1:AddToggle("BypassDupe", {
                 end
             end
         end
-    end
+    end,
 })
 
 BypassLeft1:AddToggle("BypassEyes", {
@@ -798,7 +788,7 @@ BypassLeft1:AddToggle("BypassEyes", {
                 RemotesFolder.MotorReplication:FireServer(-650)
             end
         end
-    end
+    end,
 })
 
 BypassLeft1:AddToggle("BypassLookman", {
@@ -809,7 +799,7 @@ BypassLeft1:AddToggle("BypassLookman", {
         if Value and workspace:FindFirstChild("BackdoorLookman") then
             RemotesFolder.MotorReplication:FireServer(-650)
         end
-    end
+    end,
 })
 
 BypassLeft1:AddToggle("BypassGloombatEggs", {
@@ -824,7 +814,7 @@ BypassLeft1:AddToggle("BypassGloombatEggs", {
                 end
             end
         end
-    end
+    end,
 })
 
 BypassLeft1:AddToggle("BypassSeekObstructions", {
@@ -841,7 +831,7 @@ BypassLeft1:AddToggle("BypassSeekObstructions", {
                 v.CanCollide = Value
             end
         end
-    end
+    end,
 })
 
 BypassLeft1:AddToggle("BypassVacuum", {
@@ -858,7 +848,7 @@ BypassLeft1:AddToggle("BypassVacuum", {
                 end
             end
         end
-    end
+    end,
 })
 
 BypassLeft1:AddToggle("BypassKillbricks", {
@@ -869,7 +859,7 @@ BypassLeft1:AddToggle("BypassKillbricks", {
         for _, v in pairs(CurrentRooms:GetDescendants()) do
             if v.Name == "Lava" then v.CanTouch = not Value end
         end
-    end
+    end,
 })
 
 BypassLeft1:AddToggle("BypassSeekingWall", {
@@ -887,7 +877,7 @@ BypassLeft1:AddToggle("BypassSeekingWall", {
                 end
             end
         end
-    end
+    end,
 })
 
 BypassLeft1:AddToggle("BypassSnare", {
@@ -902,7 +892,7 @@ BypassLeft1:AddToggle("BypassSnare", {
                 end
             end
         end
-    end
+    end,
 })
 
 BypassLeft1:AddToggle("BypassBanana", {
@@ -915,7 +905,7 @@ BypassLeft1:AddToggle("BypassBanana", {
                 v.CanTouch = not Value
             end
         end
-    end
+    end,
 })
 
 BypassLeft1:AddToggle("BypassJeff", {
@@ -935,7 +925,7 @@ BypassLeft1:AddToggle("BypassJeff", {
                 v.Humanoid.Health = Value and 0 or 100
             end
         end
-    end
+    end,
 })
 
 -- Damage Negation
@@ -951,7 +941,7 @@ BypassLeft2:AddToggle("NoScreechDamage", {
             RealScreech.Parent = RemotesFolder
             FakeScreech.Parent = nil
         end
-    end
+    end,
 })
 
 BypassLeft2:AddToggle("NoHaltDamage", {
@@ -966,7 +956,7 @@ BypassLeft2:AddToggle("NoHaltDamage", {
             RealShade.Parent = RemotesFolder
             FakeShade.Parent = nil
         end
-    end
+    end,
 })
 
 if RealA90 then
@@ -982,7 +972,7 @@ if RealA90 then
                 RealA90.Parent = RemotesFolder
                 FakeA90.Parent = nil
             end
-        end
+        end,
     })
 end
 
@@ -999,7 +989,7 @@ if RealSurge then
                 RealSurge.Parent = RemotesFolder
                 FakeSurge.Parent = nil
             end
-        end
+        end,
     })
 end
 
@@ -1020,7 +1010,7 @@ BypassLeft3:AddToggle("StunSelf", {
     Default = false,
     Callback = function(Value)
         if GetCharacter() then GetCharacter():SetAttribute("Stunned", Value) end
-    end
+    end,
 })
 
 -- Entity Removal (Module Rename)
@@ -1036,7 +1026,7 @@ BypassRight1:AddToggle("RemoveScreech", {
     Default = false,
     Callback = function(Value)
         RenameModule(UIModules, "Screech", "Screech_Disabled", Value)
-    end
+    end,
 })
 
 BypassRight1:AddToggle("RemoveHalt", {
@@ -1044,7 +1034,7 @@ BypassRight1:AddToggle("RemoveHalt", {
     Default = false,
     Callback = function(Value)
         RenameModule(ClientModules.EntityModules, "Shade", "Shade_Disabled", Value)
-    end
+    end,
 })
 
 if UIModules:FindFirstChild("A90") then
@@ -1053,7 +1043,7 @@ if UIModules:FindFirstChild("A90") then
         Default = false,
         Callback = function(Value)
             RenameModule(UIModules, "A90", "A90_Disabled", Value)
-        end
+        end,
     })
 end
 
@@ -1063,7 +1053,7 @@ if UIModules:FindFirstChild("Dread") then
         Default = false,
         Callback = function(Value)
             RenameModule(UIModules, "Dread", "Dread_Disabled", Value)
-        end
+        end,
     })
 end
 
@@ -1085,7 +1075,7 @@ BypassRight2:AddToggle("AntiJamming", {
                 if jamSnd then jamSnd.Playing = not Value end
             end
         end
-    end
+    end,
 })
 
 BypassRight2:AddToggle("AntiFigureHearing", {
@@ -1096,7 +1086,7 @@ BypassRight2:AddToggle("AntiFigureHearing", {
         if RemotesFolder:FindFirstChild("Crouch") then
             RemotesFolder.Crouch:FireServer(Value, true)
         end
-    end
+    end,
 })
 
 BypassRight2:AddToggle("AutoHeartbeat", {
@@ -1131,7 +1121,7 @@ BypassRight3:AddToggle("SpeedBypass", {
     Callback = function(Value)
         Options.SpeedSlider:SetMax(Value and 100 or 21)
         Options.FlySpeed:SetMax(Value and 115 or 21)
-    end
+    end,
 })
 
 BypassRight3:AddDropdown("ManipulationMode", {
@@ -1344,26 +1334,26 @@ end)
 ESPSettingsBox:AddToggle("ESP_ShowDistance", {
     Text = "Show Distance",
     Default = true,
-    Callback = function(Value) ESPLibrary:SetShowDistance(Value) end
+    Callback = function(Value) ESPLibrary:SetShowDistance(Value) end,
 })
 
 ESPSettingsBox:AddToggle("ESP_ShowTracers", {
     Text = "Show Tracers",
     Default = false,
-    Callback = function(Value) ESPLibrary:SetTracers(Value) end
+    Callback = function(Value) ESPLibrary:SetTracers(Value) end,
 })
 
 ESPSettingsBox:AddToggle("ESP_Rainbow", {
     Text = "Rainbow Effect",
     Default = false,
-    Callback = function(Value) ESPLibrary:SetRainbow(Value) end
+    Callback = function(Value) ESPLibrary:SetRainbow(Value) end,
 })
 
 ESPSettingsBox:AddDropdown("ESP_Mode", {
     Text = "ESP Mode",
     Values = { "Highlight/Text", "Text", "Highlight" },
     Default = 1,
-    Callback = function(Value) ESPLibrary:SetESPMode(Value) end
+    Callback = function(Value) ESPLibrary:SetESPMode(Value) end,
 })
 
 -- Camera
@@ -1401,7 +1391,7 @@ CameraBox:AddToggle("NoCutscenes", {
     Callback = function(Value)
         local Cutscenes = RemoteListener:FindFirstChild("Cutscenes") or RemoteListener:FindFirstChild("Cutscenes_")
         if Cutscenes then Cutscenes.Name = Value and "Cutscenes_" or "Cutscenes" end
-    end
+    end,
 })
 
 -- Environment
@@ -1410,7 +1400,7 @@ EnvBox:AddToggle("Fullbright", {
     Default = false,
     Callback = function(Value)
         if not Value then Lighting.Ambient = Color3.fromRGB(0, 0, 0) end
-    end
+    end,
 })
 
 EnvBox:AddToggle("NoFog", {
@@ -1423,7 +1413,7 @@ EnvBox:AddToggle("NoFog", {
                 if v:IsA("Atmosphere") then v.Density = 0 end
             end
         end
-    end
+    end,
 })
 
 EnvBox:AddToggle("AntiLag", {
@@ -1441,7 +1431,7 @@ EnvBox:AddToggle("AntiLag", {
                 end
             end
         end
-    end
+    end,
 })
 
 -- Notifications
@@ -1480,7 +1470,7 @@ NotifyBox:AddToggle("NotifyHasteTime", {
 NotifyBox:AddToggle("NotifySound", {
     Text = "Play Sound",
     Default = true,
-    Callback = function(Value) PlayingSound = Value end
+    Callback = function(Value) PlayingSound = Value end,
 })
 
 NotifyBox:AddButton({
@@ -1510,7 +1500,7 @@ if CurrentFloor == "Fools" or CurrentFloor == "OldHotel" then
                     v:PivotTo(Value and CFrame.new(-10000, -10000, -10000) or v:GetAttribute("Orig"))
                 end
             end
-        end
+        end,
     })
 
     HotelBox:AddToggle("RemovePaintingsDoor", {
@@ -1523,7 +1513,7 @@ if CurrentFloor == "Fools" or CurrentFloor == "OldHotel" then
                     v:PivotTo(Value and CFrame.new(-10000, -10000, -10000) or v:GetAttribute("Orig"))
                 end
             end
-        end
+        end,
     })
 
     HotelBox:AddToggle("InfiniteRevives", {
@@ -1558,7 +1548,7 @@ if CurrentFloor == "Fools" then
                     v:PivotTo(Value and CFrame.new(-10000, -10000, -10000) or v:GetAttribute("Orig"))
                 end
             end
-        end
+        end,
     })
 end
 
@@ -1596,7 +1586,7 @@ if CurrentFloor == "Mines" then
             for _, v in pairs(CurrentRooms:GetDescendants()) do
                 if v.Name == "SeekFloodline" then v.CanCollide = Value end
             end
-        end
+        end,
     })
 
     MinesBox:AddToggle("AnticheatBypass", {
@@ -1645,7 +1635,7 @@ if CurrentFloor == "Mines" then
                 end
             end
             Notify("Auto Dam Seek", "Completed!", 4)
-        end
+        end,
     })
 end
 
@@ -1677,7 +1667,7 @@ if CurrentFloor == "Retro" then
                     v.Transparency = Value and 1 or 0
                 end
             end
-        end
+        end,
     })
 end
 
@@ -1736,13 +1726,13 @@ UISettingsBox:AddButton({
         ClearAllESP()
         pcall(function() ESPLibrary:Unload() end)
         Library:Unload()
-    end
+    end,
 })
 
 UISettingsBox:AddButton({
     Text = "Rejoin Server",
     DoubleClick = true,
-    Func = function() game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer) end
+    Func = function() game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer) end,
 })
 
 UISettingsBox:AddDivider()
@@ -1761,7 +1751,7 @@ OverlaysBox:AddToggle("ShowStats", {
     Default = false,
     Callback = function(Value)
         SetStatsVisible(Value)
-    end
+    end,
 })
 
 OverlaysBox:AddButton({
@@ -1773,7 +1763,7 @@ OverlaysBox:AddButton({
             Stats.Frame.Position = Stats.Position
         end
         Notify("Stats", "Position reset", 2)
-    end
+    end,
 })
 
 -- Config (SaveManager / ThemeManager)
