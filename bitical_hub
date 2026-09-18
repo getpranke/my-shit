@@ -1,11 +1,12 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 --  BITICAL HUB — Abysall ESP + Notifications + Hiding Timer + Figure GM
---  Modified: outdoors-only Anti Surge, no slide-speed, +Disable Idle Kick,
---            +Anti Entities (spawn-prevent + damage-bypass) in Anti box,
---            +Abysall Environment auto-load
+--  Modified: Anti Surge -> Floors tab, Seek Obstructions + Figure GM moved
+--            into Anti box, SpeedBypass single-method, Velocity Manip
+--            removed, Groundskeeper/Monument ESP fixed, Entity "All" option,
+--            Item ESP fixed, thinner ESP text
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- ═══════════ ABYSALL ENVIRONMENT (loaded so getconnections / fireproximityprompt work) ═══════════
+-- ═══════════ ABYSALL ENVIRONMENT ═══════════
 if not getgenv().Abysall or not getgenv().Abysall.Environment then
     getgenv().Abysall = getgenv().Abysall or { Legit = true }
     pcall(function()
@@ -187,7 +188,7 @@ Achievement = (function()
 end)()
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- ABYSALL-STYLE ESP LIBRARY (unified)
+-- ABYSALL-STYLE ESP LIBRARY (thinner text)
 -- ═══════════════════════════════════════════════════════════════════════════
 Log("Building Abysall ESP library...")
 
@@ -197,9 +198,9 @@ local AbysallESPLibrary = (function()
     local Config = {
         Rainbow = false, ShowDistance = true,
         FillTransparency = 0.75, OutlineTransparency = 0,
-        TextTransparency = 0, TextOutlineTransparency = 0,
+        TextTransparency = 0, TextOutlineTransparency = 0.85, -- thinner stroke
         RenderLimit = 240, FadeTime = 0.25,
-        TextSize = 20, Font = Enum.Font.Highway,
+        TextSize = 14, Font = Enum.Font.Gotham, -- thinner font & smaller
         Tracers = false, TracerSize = 0.75, TracerOrigin = "Bottom",
         Arrows = false, ArrowRadius = 250, DistanceSizeRatio = 0.8,
     }
@@ -265,13 +266,14 @@ local AbysallESPLibrary = (function()
         h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; h.Parent = object
         local bb = Instance.new("BillboardGui")
         bb.Name = "AbysallESPLabel"; bb.Adornee = object
-        bb.AlwaysOnTop = true; bb.Size = UDim2.fromOffset(200, 30)
+        bb.AlwaysOnTop = true; bb.Size = UDim2.fromOffset(180, 20)
         bb.StudsOffset = Vector3.new(0, 2, 0); bb.MaxDistance = 1000
         bb.Parent = object
         local l = Instance.new("TextLabel")
         l.BackgroundTransparency = 1; l.Size = UDim2.fromScale(1, 1)
         l.Text = text; l.TextColor3 = color
-        l.TextStrokeColor3 = Color3.fromRGB(0,0,0); l.TextStrokeTransparency = Config.TextOutlineTransparency
+        l.TextStrokeColor3 = Color3.fromRGB(0,0,0)
+        l.TextStrokeTransparency = Config.TextOutlineTransparency
         l.TextTransparency = Config.TextTransparency; l.TextSize = Config.TextSize
         l.Font = Config.Font; l.TextXAlignment = Enum.TextXAlignment.Center
         l.TextYAlignment = Enum.TextYAlignment.Center; l.Parent = bb
@@ -432,7 +434,6 @@ MiscBox    = Tabs.Player:AddRightGroupbox("Misc")
 Anti              = Tabs.Exploits:AddLeftGroupbox('Anti Entities')
 Troll             = Tabs.Exploits:AddLeftGroupbox('Trolling')
 Bypass            = Tabs.Exploits:AddRightGroupbox('Bypass')
-ExploitsUniversal = Tabs.Exploits:AddRightGroupbox('Universal')
 
 TabBox       = Tabs.Visuals:AddLeftTabbox()
 ESP_Tab      = TabBox:AddTab('ESP')
@@ -467,7 +468,7 @@ LogOk("Groupboxes created")
 
 Tabs.Homepage:UpdateWarningBox({
     Title = "Changelog:",
-    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Anti Surge now outdoors-only\nSlide SpeedHack removed\nDisable Idle Kick added\nAnti Entities combined (spawn-prevent + damage-bypass)\nAbysall Environment auto-loaded</font>",
+    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Anti Surge moved to Floors tab\nFigure GM + Seek Obstructions moved to Anti box\nSpeed Bypass single-method\nVelocity Manip removed\nGroundskeeper/Monument ESP fixed\nEntity ESP 'All' added\nItem ESP fixed\nThinner ESP text</font>",
     IsNormal = true, Visible = true, LockSize = true,
 })
 
@@ -611,13 +612,11 @@ Movement:AddToggle('InstantPrompt', { Text = "Instant Interaction", Default = fa
 })
 Movement:AddToggle('NoClosetExitDelay', { Text = "No Exit Closet Delay", Default = false })
 
--- ⭐ Anti AFK (basic) — kept as-is
 Movement:AddToggle('AntiAfk', { Text = "Anti AFK", Default = false })
 table.insert(Connections, LocalPlayer.Idled:Connect(function()
     if Toggles.AntiAfk.Value then VirtualUser:CaptureController(); VirtualUser:ClickButton2(Vector2.new()) end
 end))
 
--- ⭐ NEW: Disable Idle Kick (Abysall style — via getconnections + VirtualUser fallback)
 Movement:AddToggle('DisableIdleKick', {
     Text = "Disable Idle Kick",
     Default = false,
@@ -1026,7 +1025,7 @@ MiscBox:AddButton({ Text = "Copy Job ID", DoubleClick = false, Func = function()
 end })
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- ⭐ ANTI ENTITIES (combined — spawn-prevent + damage-bypass, Abysall style)
+-- ⭐ ANTI ENTITIES (combined — spawn-prevent + damage-bypass + Figure GM + Seek Obstructions)
 -- ═══════════════════════════════════════════════════════════════════════════
 Log("Setting up Anti Entities...")
 
@@ -1162,60 +1161,77 @@ Anti:AddToggle('NoA90Damage', { Text = "No A-90 Damage", Default = false,
     end
 })
 
--- ⭐ Anti Surge — OUTDOORS ONLY
-local AntiSurgeApplied = false
-local function IsOutdoors()
-    local char = LocalPlayer.Character
-    if not char then return false end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = { char }
-    local result = workspace:Raycast(hrp.Position, Vector3.new(0, 300, 0), params)
-    return result == nil
-end
+Anti:AddDivider()
 
-local function ApplyAntiSurgeState(active)
-    if not FakeEvents.Surge_Real then
-        FakeEvents.Surge_Real = RemoteFolder:FindFirstChild("SurgeRemote")
+-- ⭐ Figure Godmode (single method, no dropdown)
+do
+    local FigureRigs = {}
+    local CurrentRoomsRef = workspace:WaitForChild("CurrentRooms", 10)
+    if CurrentRoomsRef then
+        local function addFigure(figure)
+            if figure.Name == "FigureRig" and figure:FindFirstChild("Root") then
+                table.insert(FigureRigs, figure)
+            end
+        end
+        for _, gs in CurrentRoomsRef:GetDescendants() do addFigure(gs) end
+        CurrentRoomsRef.DescendantAdded:Connect(addFigure)
+        CurrentRoomsRef.DescendantRemoving:Connect(function(figure)
+            local found = table.find(FigureRigs, figure)
+            if found then table.remove(FigureRigs, found) end
+        end)
     end
-    if not FakeEvents.Surge_Real then return end
-    if active and not AntiSurgeApplied then
-        FakeEvents.Surge.Parent = RemoteFolder
-        FakeEvents.Surge_Real.Parent = ReplicatedStorage
-        AntiSurgeApplied = true
-    elseif not active and AntiSurgeApplied then
-        FakeEvents.Surge_Real.Parent = RemoteFolder
-        FakeEvents.Surge.Parent = ReplicatedStorage
-        AntiSurgeApplied = false
+    local function ShouldSpoof(hrp)
+        if not (Toggles.FigureGodmode and Toggles.FigureGodmode.Value) then return false end
+        for _, figure in FigureRigs do
+            local root = figure:FindFirstChild("Root")
+            if root and (root.Position * Vector3.new(1, 0, 1) - hrp.Position * Vector3.new(1, 0, 1)).Magnitude < 25 then
+                return true
+            end
+        end
+        return false
     end
+    local FigureCamera = workspace.CurrentCamera
+    workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+        FigureCamera = workspace.CurrentCamera or FigureCamera
+    end)
+    RunService.Heartbeat:Connect(function()
+        if not (Toggles.FigureGodmode and Toggles.FigureGodmode.Value) then return end
+        local character = LocalPlayer.Character
+        local hrp = character and character:FindFirstChild("HumanoidRootPart")
+        if hrp and ShouldSpoof(hrp) then
+            hrp.CFrame *= CFrame.new(0, 9.5, 0)
+            RunService.RenderStepped:Wait()
+            hrp.CFrame *= CFrame.new(0, -9.5, 0)
+            FigureCamera.CFrame -= Vector3.new(0, 9.5, 0)
+        end
+    end)
 end
-
-Anti:AddToggle('NoSurgeDamage', {
-    Text = "No Surge Damage (outdoors only)",
+Anti:AddToggle('FigureGodmode', {
+    Text = "Figure Godmode",
     Default = false,
-    Tooltip = "Only swaps the Surge remote while you are outdoors."
+    Tooltip = "Prevents Figure from hurting you on Hotel and Mines floors."
 })
-Toggles.NoSurgeDamage:OnChanged(function(v)
-    if not v then
-        ApplyAntiSurgeState(false)
-    end
-end)
--- Background monitor: swap only while outdoors
-task.spawn(function()
-    while task.wait(0.5) do
-        if Library.Unloaded then break end
-        if Toggles.NoSurgeDamage and Toggles.NoSurgeDamage.Value then
-            ApplyAntiSurgeState(IsOutdoors())
+
+-- ⭐ Anti Seek Obstructions (single method, no dropdown)
+Anti:AddToggle('AntiSeekObstructions', {
+    Text = "Anti Seek Obstructions",
+    Default = false,
+    Tooltip = "Prevents chandeliers and seek arms from harming you.",
+    Callback = function(v)
+        for _, o in ipairs(workspace.CurrentRooms:GetDescendants()) do
+            if o.Name == "ChandelierObstruction" or o.Name == "Seek_Arm" then
+                for _, p in ipairs(o:GetChildren()) do
+                    if p:IsA("BasePart") then p.CanTouch = not v end
+                end
+            end
         end
     end
-end)
+})
 
 Anti:AddDivider()
 Anti:AddLabel({ Text = "Spawn-prevent toggles rename the entity module so it never loads. Damage-bypass toggles swap the remote event with a dummy.", DoesWrap = true })
 
--- ═══════════ BYPASS ═══════════
+-- ═══════════ BYPASS (cleaned) ═══════════
 local nothitted = false
 task.spawn(function()
     while task.wait(0.35) do
@@ -1230,56 +1246,30 @@ task.spawn(function()
     end
 end)
 
--- ⭐ ABYSALL SPEED BYPASS
+-- ⭐ SPEED BYPASS — single method (Mass Switch, Abysall style, no dropdown)
 SpeedBypassInterval = 0.216
-Bypass:AddDropdown("SpeedBypassMethod", {
-    Values = {"Mass Switch", "Network Sleep"}, Default = 1, Multi = false, Text = "Speed Bypass Mode",
-    Callback = function(Value)
-        if Toggles.SpeedBypass and Toggles.SpeedBypass.Value then
-            if Value == "Mass Switch" then
-                Options.SpeedBoostSlider:SetMax(100)
-                Options.FlySpeed:SetMax(100)
-            elseif Value == "Network Sleep" then
-                Options.SpeedBoostSlider:SetMax(150)
-                Options.FlySpeed:SetMax(150)
-            end
-        end
-    end,
-})
 Bypass:AddToggle('SpeedBypass', {
     Text = "Speed Bypass",
     Default = false,
+    Tooltip = "Abysall Mass-Switch speed bypass. Raises speed cap to 100.",
     Callback = function(Value)
         if Value then
-            if Options.SpeedBypassMethod.Value == "Network Sleep" and not sethiddenproperty then
-                Library:Notify("Network Sleep mode unavailable, executor lacks Sethiddenproperty", 5)
-                Toggles.SpeedBypass:SetValue(false)
-                return
-            end
-            if Options.SpeedBypassMethod.Value == "Mass Switch" then
-                Options.SpeedBoostSlider:SetMax(100)
-            elseif Options.SpeedBypassMethod.Value == "Network Sleep" then
-                Options.SpeedBoostSlider:SetMax(150)
-            end
-            Options.SpeedBoostSlider:SetValue(Value and Options.SpeedBoostSlider.Value or 21)
-            Options.FlySpeed:SetMax(Value and 100 or 21)
-            Options.FlySpeed:SetValue(Value and Options.FlySpeed.Value or 21)
+            Options.SpeedBoostSlider:SetMax(100)
+            Options.FlySpeed:SetMax(100)
             task.spawn(function()
                 while Toggles.SpeedBypass.Value do
                     task.wait(SpeedBypassInterval)
                     if alive then
-                        if Options.SpeedBypassMethod.Value == "Mass Switch" then
-                            local cc1 = LocalPlayer.Character:FindFirstChild("_CollisionPart")
-                            local cc2 = LocalPlayer.Character:FindFirstChild("_CollisionPart2")
-                            if cc1 and cc2 then
-                                if Character.CollisionPart.Anchored or nothitted or (Toggles.AnticheatManipulation and Toggles.AnticheatManipulation.Value) then
-                                    cc1.Massless = true; cc2.Massless = true
-                                    task.wait(0.35)
-                                else
-                                    cc1.Massless = true; cc2.Massless = true
-                                    task.wait(SpeedBypassInterval)
-                                    cc2.Massless = false; cc1.Massless = false
-                                end
+                        local cc1 = LocalPlayer.Character:FindFirstChild("_CollisionPart")
+                        local cc2 = LocalPlayer.Character:FindFirstChild("_CollisionPart2")
+                        if cc1 and cc2 then
+                            if Character.CollisionPart.Anchored or nothitted or (Toggles.AnticheatManipulation and Toggles.AnticheatManipulation.Value) then
+                                cc1.Massless = true; cc2.Massless = true
+                                task.wait(0.35)
+                            else
+                                cc1.Massless = true; cc2.Massless = true
+                                task.wait(SpeedBypassInterval)
+                                cc2.Massless = false; cc1.Massless = false
                             end
                         end
                     end
@@ -1303,39 +1293,6 @@ Bypass:AddSlider("SpeedBypassInternal", {
     Callback = function(Value) SpeedBypassInterval = Value end,
 })
 Bypass:AddDivider()
-
--- Abysall Network Sleep background handler
-task.spawn(function()
-    while task.wait() do
-        if Library.Unloaded then break end
-        if Toggles.SpeedBypass and Toggles.SpeedBypass.Value
-           and Options.SpeedBypassMethod and Options.SpeedBypassMethod.Value == "Network Sleep" then
-            if sethiddenproperty then
-                local cc1 = LocalPlayer.Character:FindFirstChild("_CollisionPart")
-                local cc2 = LocalPlayer.Character:FindFirstChild("_CollisionPart2")
-                if cc1 and not cc1.Massless then cc1.Massless = true end
-                if cc2 and not cc2.Massless then cc2.Massless = true end
-                SetProperty = sethiddenproperty
-                if alive then
-                    local loop = RunService.RenderStepped:Connect(function()
-                        if Toggles.SpeedBypass.Value and Options.SpeedBypassMethod.Value == "Network Sleep" then
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true) task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false) task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true) task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false) task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false) task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false) task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true) task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true) task.wait()
-                        end
-                    end)
-                    task.wait()
-                    if loop then loop:Disconnect() end
-                end
-            end
-        end
-    end
-end)
 
 local GodModeCameraHandler = { enabled = false }
 local function GodModeCameraStep()
@@ -1375,41 +1332,6 @@ Toggles.CrouchSpoof:OnChanged(function(v)
 end)
 Bypass:AddDivider()
 
-local cogAlt, noSpread, fastThrow = false, false, false
-local OGC1 = Character.LowerTorso and Character.LowerTorso.Root and Character.LowerTorso.Root.C1
-local hookNamecall
-
-Bypass:AddToggle('CollisionOffsetGodmodeAlt', { Text = "Position Offset Alt", Default = false,
-    Callback = function(value)
-        if value then
-            cogAlt = true
-            Character.HumanoidRootPart.CFrame = Character.HumanoidRootPart.CFrame * CFrame.new(0, -2.146, 0)
-            Character.Humanoid.HipHeight = 0.25
-            Crouch:FireServer(true)
-            Connections.POA = RunService.RenderStepped:Connect(function()
-                if Character:FindFirstChild("LowerTorso") and Character.LowerTorso:FindFirstChild("Root") then
-                    Character.LowerTorso.Root.C1 = OGC1 * CFrame.new(0, -2.146, 0)
-                end
-                Character.Collision.Position = Character.HumanoidRootPart.Position + Vector3.new(0, 2.146, 0)
-            end)
-        else
-            cogAlt = false
-            if Connections.POA then Connections.POA:Disconnect() end
-            Character.HumanoidRootPart.CFrame *= CFrame.new(0, 2.146, 0)
-            Character.Humanoid.HipHeight = 2.4
-            if Character:FindFirstChild("LowerTorso") and Character.LowerTorso:FindFirstChild("Root") then
-                Character.LowerTorso.Root.C1 = OGC1
-            end
-        end
-    end
-}):AddKeyPicker("CollisionOffsetGodmodeAltKey", { Text="Position Offset Alt", Default="U", Mode="Toggle", SyncToggleState=true })
-
-Bypass:AddToggle('NoSpread', { Text = 'No Spread', Default = false, Callback = function(value) noSpread = value end })
-Bypass:AddToggle('FastThrow', { Text = 'Fast Throw', Default = false, Callback = function(value) fastThrow = value end })
-Bypass:AddDivider()
-
--- ⚠️ Slide Speed Hack REMOVED per request
-
 AnticheatManipulationLoop = nil; AnticheatManipulationEnabled = false; OriginalNoclipState = false
 Bypass:AddToggle('AnticheatManipulation', { Text = "Manipulator", Default = false,
     Callback = function(v)
@@ -1435,177 +1357,11 @@ Bypass:AddToggle('AnticheatManipulation', { Text = "Manipulator", Default = fals
     end
 }):AddKeyPicker('AnticheatManipulationKeybind', { Default='H', SyncToggleState=true, Mode='Toggle', Text='Manipulator', NoUI=false, Callback=function() end, ChangedCallback=function() end })
 
-Bypass:AddToggle('VelocityManipulation', { Text = "Velocity Manipulation", Default = false }):AddKeyPicker('VelocityManipulationKeybind', { Default='V', Mode='Hold', SyncToggleState=true, Text='Velocity Manipulation' })
-Bypass:AddDropdown("VelocityManipulationMode", { Values={ "Velocity", "Pivot" }, Default=1, Text="Manipulation Method" })
-do
-    local MB = Instance.new("BodyVelocity")
-    MB.MaxForce = Vector3.new(9e9, 9e9, 9e9); MB.Name = "SniperManipBody"
-    RunService.Heartbeat:Connect(function()
-        if Library.Unloaded then return end
-        local c = LocalPlayer.Character; if not c then return end
-        local r = c:FindFirstChild("HumanoidRootPart"); if not r then return end
-        if Toggles.VelocityManipulation.Value and Options.VelocityManipulationMode.Value == "Velocity" then
-            MB.Parent = r; MB.Velocity = r.CFrame.LookVector * 2.25
-        else MB.Parent = nil end
-    end)
-end
+-- ⚠️ Velocity Manipulation REMOVED per request
+
 Bypass:AddDivider()
 Bypass:AddToggle('UseToolsAnyWhere', { Text = "Use Tools Anywhere", Default = false,
     Callback = function(v) RequiredMainGame.canUseItems = v end })
-
--- INFINITE ITEMS
-local Disable3 = false
-local Prompt = Instance.new("ProximityPrompt", workspace); Prompt.Name = "TestPrompt"
-pcall(function() return fireproximityprompt(Prompt) end); Prompt:Destroy()
-local LockpickParents = { ChestBoxLocked=true, Locker_Small_Locked=true, Toolbox_Locked=true }
-local LockpickNames = { UnlockPrompt=true, ThingToEnable=true, LockPrompt=true, SkullPrompt=true, FusesPrompt=true }
-local ShearsParents = { Chest_Vine=true, CuttableVines=true, Cellar=true }
-local ShearsNames = { SkullPrompt=true }
-local InfStore, InfSStore = {}, {}
-local function scanPrompts(vp, vn)
-    local t = {}
-    for _, v in ipairs(workspace.CurrentRooms:GetDescendants()) do
-        if v:IsA("ProximityPrompt") and (vp[v.Parent.Name] or vn[v.Name]) then table.insert(t, v) end
-    end
-    return t
-end
-local function cleanupEnableReal()
-    for _, v in ipairs(workspace.CurrentRooms:GetDescendants()) do
-        if v.Name == "FakePrompt" and v.Parent then v:Destroy() end
-        if v:IsA("ProximityPrompt") and v.Name ~= "FakePrompt" then
-            pcall(function()
-                v.Enabled = true; v.ClickablePrompt = true
-                if v:GetAttribute("HasFake") == true then v:SetAttribute("HasFake", nil) end
-            end)
-        end
-    end
-end
-local function addFake(prompt, mode)
-    if not prompt or not prompt:IsA("ProximityPrompt") then return end
-    if prompt:GetAttribute("HasFake") then return end
-    prompt:SetAttribute("HasFake", true)
-    local fake = prompt:Clone(); fake.Name = "FakePrompt"; fake.Parent = prompt.Parent
-    fake.Enabled = true; fake.ClickablePrompt = true
-    prompt.Enabled = false; prompt.ClickablePrompt = false
-    fake.Triggered:Connect(function()
-        local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-        if not tool then return end
-        if RemoteFolder:FindFirstChild("DropItem") then RemoteFolder.DropItem:FireServer(tool) end
-        local con
-        con = Workspace.Drops.ChildAdded:Connect(function(v)
-            local p = v:FindFirstChildOfClass("ProximityPrompt")
-            if p then
-                if mode == "Lockpick" then pcall(fireproximityprompt, p); pcall(fireproximityprompt, prompt)
-                elseif mode == "Shears" then pcall(fireproximityprompt, prompt); pcall(fireproximityprompt, p) end
-                task.wait(0.3); con:Disconnect()
-            end
-        end)
-    end)
-end
-local function setupRealtimeDetection()
-    return workspace.DescendantAdded:Connect(function(v)
-        task.wait(0.1)
-        if v:IsA("ProximityPrompt") then
-            if LockpickParents[v.Parent.Name] or LockpickNames[v.Name] then
-                if Toggles.InfiniteItems and Toggles.InfiniteItems.Value then
-                    table.insert(InfStore, v)
-                    local hasTool = LocalPlayer.Character and (LocalPlayer.Character:FindFirstChild("Lockpick") or LocalPlayer.Character:FindFirstChild("SkeletonKey"))
-                    if hasTool and not v:GetAttribute("HasFake") then addFake(v, "Lockpick") end
-                end
-            end
-            if ShearsParents[v.Parent.Name] or ShearsNames[v.Name] then
-                if Toggles.InfiniteSItems and Toggles.InfiniteSItems.Value then
-                    table.insert(InfSStore, v)
-                    local hasTool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Shears")
-                    if hasTool and not v:GetAttribute("HasFake") then addFake(v, "Shears") end
-                end
-            end
-        end
-    end)
-end
-local realtimeDetectionConn = nil
-Bypass:AddToggle('InfiniteItems', { Text = "Infinite Lockpicks", Default = false,
-    Callback = function(v)
-        if v then
-            InfStore = scanPrompts(LockpickParents, LockpickNames)
-            if not realtimeDetectionConn then realtimeDetectionConn = setupRealtimeDetection() end
-            table.insert(Connections, RunService.Heartbeat:Connect(function()
-                if not Toggles.InfiniteItems.Value then return end
-                local hasTool = LocalPlayer.Character and (LocalPlayer.Character:FindFirstChild("Lockpick") or LocalPlayer.Character:FindFirstChild("SkeletonKey"))
-                if hasTool then
-                    for _, prompt in ipairs(InfStore) do
-                        if prompt and prompt.Parent and not prompt:GetAttribute("HasFake") then addFake(prompt, "Lockpick") end
-                    end
-                end
-            end))
-        else cleanupEnableReal(); InfStore = {} end
-    end
-})
-Bypass:AddToggle('InfiniteSItems', { Text = "Infinite Shears", Default = false,
-    Callback = function(v)
-        if v then
-            InfSStore = scanPrompts(ShearsParents, ShearsNames)
-            if not realtimeDetectionConn then realtimeDetectionConn = setupRealtimeDetection() end
-            table.insert(Connections, RunService.Heartbeat:Connect(function()
-                if not Toggles.InfiniteSItems.Value then return end
-                local hasTool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Shears")
-                if hasTool then
-                    for _, prompt in ipairs(InfSStore) do
-                        if prompt and prompt.Parent and not prompt:GetAttribute("HasFake") then addFake(prompt, "Shears") end
-                    end
-                end
-            end))
-        else cleanupEnableReal(); InfSStore = {} end
-    end
-})
-
-local raycastParms = RaycastParams.new()
-raycastParms.FilterDescendantsInstances = { LocalPlayer.Character }
-raycastParms.FilterType = Enum.RaycastFilterType.Blacklist
-local DropTable = { RushMoving = 54, AmbushMoving = 67, A60 = 70 }
-local InfiniteCrucifixConnection = nil
-Bypass:AddToggle('InfiniteCrucifix', { Text = "Infinite Crucifix", Default = false, Risky = true,
-    Tooltip = "You may die or lose the crucifix",
-    Callback = function(v)
-        if v then
-            if not InfiniteCrucifixConnection then
-                InfiniteCrucifixConnection = RunService.RenderStepped:Connect(function()
-                    if Toggles.InfiniteCrucifix.Value then
-                        local character = LocalPlayer.Character; if not character then return end
-                        local crucifixTool = nil
-                        for _, tool in ipairs(character:GetChildren()) do
-                            if tool:IsA("Tool") and (tool.Name == "Crucifix" or tool.Name == "CrucifixWall") then crucifixTool = tool break end
-                        end
-                        if not crucifixTool then return end
-                        for _, v in ipairs(workspace:GetChildren()) do
-                            local Entity = DropTable[v.Name]
-                            if Entity and v.PrimaryPart then
-                                v.PrimaryPart.CanCollide = true; v.PrimaryPart.CanQuery = true
-                                local o2 = character.CollisionPart.Position
-                                local r2 = workspace:Raycast(o2, (v.PrimaryPart.Position - o2), raycastParms)
-                                if r2 and r2.Instance:IsDescendantOf(v) then
-                                    if (character.CollisionPart.Position - v.PrimaryPart.Position).Magnitude < Entity then
-                                        if RemoteFolder:FindFirstChild("DropItem") then RemoteFolder.DropItem:FireServer(crucifixTool) end
-                                        task.wait(0.54)
-                                        if workspace:FindFirstChild("Drops") then
-                                            local dc = workspace.Drops:FindFirstChild("Crucifix") or workspace.Drops:FindFirstChild("CrucifixWall")
-                                            if dc then
-                                                local prompt = dc:FindFirstChildOfClass("ProximityPrompt")
-                                                if prompt then pcall(fireproximityprompt, prompt) end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end)
-            end
-        else
-            if InfiniteCrucifixConnection then InfiniteCrucifixConnection:Disconnect() InfiniteCrucifixConnection = nil end
-        end
-    end
-})
 LogOk("Bypass done")
 
 -- ═══════════ UNIVERSAL ═══════════
@@ -1697,69 +1453,6 @@ task.spawn(function()
     end
 end)
 
--- ⭐ FIGURE GODMODE (restored)
-ExploitsUniversal:AddToggle('FigureGodmode', {
-    Text = "Figure Godmode (Floors 1 & 2)", Default = false,
-    Tooltip = "Prevents 'Figure' from hurting you on Hotel and Mines floors."
-})
-do
-    local FigureRigs = {}
-    local CurrentRoomsRef = workspace:WaitForChild("CurrentRooms", 10)
-    if CurrentRoomsRef then
-        local function addFigure(figure)
-            if figure.Name == "FigureRig" and figure:FindFirstChild("Root") then
-                table.insert(FigureRigs, figure)
-            end
-        end
-        for _, gs in CurrentRoomsRef:GetDescendants() do addFigure(gs) end
-        CurrentRoomsRef.DescendantAdded:Connect(addFigure)
-        CurrentRoomsRef.DescendantRemoving:Connect(function(figure)
-            local found = table.find(FigureRigs, figure)
-            if found then table.remove(FigureRigs, found) end
-        end)
-    end
-    local function ShouldSpoof(hrp)
-        if not (Toggles.FigureGodmode and Toggles.FigureGodmode.Value) then return false end
-        for _, figure in FigureRigs do
-            local root = figure:FindFirstChild("Root")
-            if root and (root.Position * Vector3.new(1, 0, 1) - hrp.Position * Vector3.new(1, 0, 1)).Magnitude < 25 then
-                return true
-            end
-        end
-        return false
-    end
-    local FigureCamera = workspace.CurrentCamera
-    workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
-        FigureCamera = workspace.CurrentCamera or FigureCamera
-    end)
-    RunService.Heartbeat:Connect(function()
-        if not (Toggles.FigureGodmode and Toggles.FigureGodmode.Value) then return end
-        local character = LocalPlayer.Character
-        local hrp = character and character:FindFirstChild("HumanoidRootPart")
-        if hrp and ShouldSpoof(hrp) then
-            hrp.CFrame *= CFrame.new(0, 9.5, 0)
-            RunService.RenderStepped:Wait()
-            hrp.CFrame *= CFrame.new(0, -9.5, 0)
-            FigureCamera.CFrame -= Vector3.new(0, 9.5, 0)
-        end
-    end)
-end
-
-ExploitsUniversal:AddToggle('AntiSeekObstructions', {
-    Text = "Anti Seek Obstructions (Floors 1 & 2)", Default = false,
-    Callback = function(v)
-        for _, o in ipairs(workspace.CurrentRooms:GetDescendants()) do
-            if o.Name == "ChandelierObstruction" or o.Name == "Seek_Arm" then
-                for _, p in ipairs(o:GetChildren()) do
-                    if p:IsA("BasePart") then p.CanTouch = not v end
-                end
-            end
-        end
-    end
-})
-
--- ⚠️ Old AntiSurge removed — new one lives in Anti groupbox (outdoors-only)
-
 -- ═══════════ TROLLING ═══════════
 Troll:AddToggle("Spamtoolz", { Text = "Abuse Others' Tools", Default = false }):AddKeyPicker("Spamtoolz_X", {
     Default="X", SyncToggleState=false, Mode="Toggle", Text="Abuse Others' Tools", NoUI=false })
@@ -1787,16 +1480,18 @@ ESP_Settings:AddToggle('RainbowESP', { Text = 'Rainbow ESP', Default = false, Ca
 ESP_Settings:AddToggle('ESPShowDistance', { Text = "Show Distance", Default = true, Callback = function(v) Abysall.ESPLibrary:SetShowDistance(v) end })
 ESP_Settings:AddToggle('GlobalTracerEnabled', { Text = "Tracers", Default = false, Callback = function(v) Abysall.ESPLibrary:SetTracers(v) end })
 ESP_Settings:AddToggle('GlobalArrowsEnabled', { Text = "Arrows", Default = false, Callback = function(v) Abysall.ESPLibrary:SetArrows(v) end })
-ESP_Settings:AddSlider('GlobalTextSize', { Text = "Text Size", Default = 20, Min = 10, Max = 50, Rounding = 0, Compact = true,
+ESP_Settings:AddSlider('GlobalTextSize', { Text = "Text Size", Default = 14, Min = 8, Max = 40, Rounding = 0, Compact = true,
     Callback = function(v) Abysall.ESPLibrary:SetTextSize(v) end })
 ESP_Settings:AddSlider('GlobalOutlineTransparency', { Text = "Outline Transparency", Default = 0, Min = 0, Max = 1, Rounding = 2, Compact = true,
     Callback = function(v) Abysall.ESPLibrary:SetOutlineTransparency(v) end })
 ESP_Settings:AddSlider('GlobalFillTransparency', { Text = "Fill Transparency", Default = 0.75, Min = 0, Max = 1, Rounding = 2, Compact = true,
     Callback = function(v) Abysall.ESPLibrary:SetFillTransparency(v) end })
+ESP_Settings:AddSlider('GlobalTextStrokeTransparency', { Text = "Text Stroke Transparency", Default = 0.85, Min = 0, Max = 1, Rounding = 2, Compact = true,
+    Callback = function(v) Abysall.ESPLibrary:SetTextOutlineTransparency(v) end })
 ESP_Settings:AddDropdown("ESPTextFont", {
     Text = "Text Font",
-    Values = { "Highway","GothamBold","Gotham","SourceSansBold","SourceSans","Arial","Code","SciFi","Cartoon","Fantasy" },
-    Default = "Highway",
+    Values = { "Gotham","GothamMedium","GothamBold","GothamBlack","Highway","SourceSans","SourceSansBold","Arial","Code","SciFi","Cartoon","Fantasy" },
+    Default = "Gotham",
     Callback = function(v) Abysall.ESPLibrary:SetFont(Enum.Font[v]) end
 })
 
@@ -1963,7 +1658,7 @@ ESP_Tab:AddToggle('TaskESP', { Text = "Tasks", Default = false,
     Callback = function(v) TaskColor = v; for obj in pairs(TaskESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end end
 })
 
--- ITEM ESP
+-- ⭐ ITEM ESP (FIXED)
 local ItemsColor = Color3.fromRGB(170, 0, 255)
 local ItemsESPObjects = {}
 local ItemList = {
@@ -1978,47 +1673,82 @@ local ItemList = {
     RiftSmoothie="Rift Smoothie", GweenSoda="Soda", GlitchCube="Glitch Cube",
     RiftJar="Rift Jar", Compass="Compass", Lantern="Lantern", Multitool="Multitool",
     Lotus="Lotus", TipJar="Tip Jar", LotusPetalPickup="Lotus Petal", KeyIron="Iron Key",
-    CandyBag="Candy Bag", Donut="Donut"
+    CandyBag="Candy Bag", Donut="Donut", Scanner="Tablet", Bomb="Bomb",
+    Knockbomb="Knockbomb", Nanner="Nanner", BigBomb="Big Bomb", SnakeBox="Hiding Box",
+    GoldGun="Golden Gun", StopSign="Stop Sign", AloeVera="Aloe Vera", BoxingGloves="Boxing Gloves"
 }
-local function isOwned(item)
+
+-- ⭐ FIXED: resolve the actual model/part that has the ESP-worthy geometry
+local function ResolveItemTarget(obj)
+    if not obj or not obj.Parent then return nil end
+    -- If it's already a model with a PrimaryPart, use it directly
+    if obj:IsA("Model") then
+        if obj.PrimaryPart then return obj end
+        local part = obj:FindFirstChildWhichIsA("BasePart")
+        if part then
+            -- assign a primary part so highlight/billboard adornee works
+            obj.PrimaryPart = part
+            return obj
+        end
+        -- fallback: use first descendant BasePart's parent model
+        local desc = obj:FindFirstChildWhichIsA("BasePart", true)
+        if desc then return obj end
+        return nil
+    end
+    if obj:IsA("BasePart") then
+        -- return the parent model if it's a Model
+        if obj.Parent and obj.Parent:IsA("Model") then return obj.Parent end
+        return obj
+    end
+    return nil
+end
+
+-- ⭐ FIXED: only filter items actually owned/equipped by players, not just any descendant
+local function isPlayerOwnedItem(item)
     local cur = item
     while cur and cur ~= workspace do
+        if cur:IsA("Tool") then return true end
         if cur:IsA("Model") then
             local p = Players:GetPlayerFromCharacter(cur)
-            if p and p == LocalPlayer then return true end
-            if cur:IsA("Tool") then
-                local o = cur:FindFirstChild("Owner")
-                if o and o.Value then return true end
-                local par = cur.Parent
-                if par and (par:IsA("Backpack") or (par:IsA("Model") and Players:GetPlayerFromCharacter(par))) then return true end
-            end
+            if p then return true end
         end
-        cur = cur.Parent
+        local par = cur.Parent
+        if par and par:IsA("Backpack") then return true end
+        cur = par
     end
     return false
 end
+
 ESP_Tab:AddToggle('Items', { Text = "Items", Default = false,
     Callback = function(v)
         if v then
+            -- scan rooms
             for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
                 local rn = tonumber(room.Name)
                 if rn and shouldShowESP(rn) then
                     for _, obj in ipairs(room:GetDescendants()) do
                         local label = ItemList[obj.Name]
-                        if label and obj:IsA("Model") and obj.PrimaryPart and not isOwned(obj) then
-                            Abysall.ESPLibrary:AddESP({ Object = obj, Text = label, Color = ItemsColor })
-                            ItemsESPObjects[obj] = true
+                        if label and not ItemsESPObjects[obj] and not isPlayerOwnedItem(obj) then
+                            local target = ResolveItemTarget(obj)
+                            if target then
+                                Abysall.ESPLibrary:AddESP({ Object = target, Text = label, Color = ItemsColor })
+                                ItemsESPObjects[target] = true
+                            end
                         end
                     end
                 end
             end
+            -- scan drops folder
             local drops = workspace:FindFirstChild("Drops")
             if drops then
                 for _, obj in ipairs(drops:GetChildren()) do
                     local label = ItemList[obj.Name]
-                    if label and obj:IsA("Model") and obj.PrimaryPart then
-                        Abysall.ESPLibrary:AddESP({ Object = obj, Text = label, Color = ItemsColor })
-                        ItemsESPObjects[obj] = true
+                    if label and not ItemsESPObjects[obj] then
+                        local target = ResolveItemTarget(obj)
+                        if target then
+                            Abysall.ESPLibrary:AddESP({ Object = target, Text = label, Color = ItemsColor })
+                            ItemsESPObjects[target] = true
+                        end
                     end
                 end
             end
@@ -2030,6 +1760,35 @@ ESP_Tab:AddToggle('Items', { Text = "Items", Default = false,
 }):AddColorPicker('ItemsColorPicker', { Default = ItemsColor, Title = 'Items Color', Transparency = 0,
     Callback = function(v) ItemsColor = v; for obj in pairs(ItemsESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end end
 })
+-- Live rescan for items entering the world
+table.insert(Connections, workspace.DescendantAdded:Connect(function(obj)
+    if not Toggles.Items or not Toggles.Items.Value then return end
+    task.wait(0.15)
+    if not obj or not obj.Parent then return end
+    local label = ItemList[obj.Name]
+    if not label then return end
+    if isPlayerOwnedItem(obj) then return end
+    local cr = LocalPlayer:GetAttribute("CurrentRoom")
+    if not cr then return end
+    -- ensure it's in current or next room, or in Drops
+    local okRoom = false
+    local cur = obj
+    while cur and cur ~= workspace do
+        if cur == workspace:FindFirstChild("Drops") then okRoom = true break end
+        if cur.Parent == workspace.CurrentRooms then
+            local rn = tonumber(cur.Name)
+            if rn and (rn == cr or rn == cr + 1) then okRoom = true end
+            break
+        end
+        cur = cur.Parent
+    end
+    if not okRoom then return end
+    local target = ResolveItemTarget(obj)
+    if target and not ItemsESPObjects[target] then
+        Abysall.ESPLibrary:AddESP({ Object = target, Text = label, Color = ItemsColor })
+        ItemsESPObjects[target] = true
+    end
+end))
 
 -- GOLD ESP
 local GoldColor = Color3.fromRGB(255, 255, 0)
@@ -2114,50 +1873,131 @@ ESP_Tab:AddToggle('Stardust', { Text = "Stardust", Default = false,
     Callback = function(v) StardustColor = v; for obj in pairs(StardustESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end end
 })
 
--- ENTITY ESP
+-- ⭐ ENTITY ESP (with "All" option + Groundskeeper + Monument fixed)
 local EntityColor = Color3.fromRGB(255, 0, 0)
 local EntityESPObjects = {}
 local EntityAlias = {
     RushMoving="Rush", AmbushMoving="Ambush", GlitchRush="GlitchRush", GlitchAmbush="GlitchAmbush",
-    A60="A-60", A120="A-120", Eyes="Eyes", BackdoorLookman="Lookman", BackdoorRush="Blitz",
-    Groundskeeper="Groundskeeper", MonumentEntity="Monument", FigureRig="Figure",
-    FigureRagdoll="Figure", LiveEntityBramble="Bramble", GiggleCeiling="Giggle",
-    Snare="Snare", GrumbleRig="Grumble", FakeDoor="Dupe", DoorFake="Dupe"
+    A60="A-60", A120="A-120", Eyes="Eyes", Lookman="Lookman",
+    BackdoorLookman="Lookman", BackdoorRush="Blitz",
+    Groundskeeper="Groundskeeper", MonumentEntity="Monument",
+    FigureRig="Figure", FigureRagdoll="Figure", Figure="Figure",
+    LiveEntityBramble="Bramble", GiggleCeiling="Giggle", Snare="Snare",
+    GrumbleRig="Grumble", FakeDoor="Dupe", DoorFake="Dupe",
+    CustomEntity="Custom Entity", FrozenAmbush="Frozen Ambush",
+    SallyMoving="Sally", JeffTheKiller="Jeff the Killer",
+    GloombatSwarm="Gloombat Swarm", SeekMovingNewClone="Seek",
+    HideRig="Hide", Timothy="Timothy", SpiderJumpscare="Timothy",
+    DreadEntity="Dread", ShadeEntity="Halt", Dread="Dread",
 }
+
+-- Helper: force-resolve the correct ESP target for special entities
+local function ResolveEntityTarget(ent)
+    if not ent or not ent.Parent then return nil end
+    -- Monument ESP needs to attach to the "Top" part inside MonumentEntity
+    if ent.Name == "MonumentEntity" then
+        local top = ent:FindFirstChild("Top", true) or ent:FindFirstChildWhichIsA("BasePart")
+        return top or ent
+    end
+    -- Groundskeeper: prefer HumanoidRootPart
+    if ent.Name == "Groundskeeper" then
+        local hrp = ent:FindFirstChild("HumanoidRootPart")
+        return hrp or ent.PrimaryPart or ent:FindFirstChildWhichIsA("BasePart") or ent
+    end
+    return ent
+end
+
 ESP_Tab:AddDropdown("EntityESPOptions", {
     Text = "Entities Filter",
-    Values = { "Rush","Ambush","Eyes","Dupe","Figure","Blitz","Lookman","Snare","Giggle","Grumble","A-60","A-120","Monument","Bramble","Groundskeeper" },
-    Multi = true, AllowNull = true,
+    Values = { "All","Rush","Ambush","Eyes","Dupe","Figure","Blitz","Lookman","Snare",
+               "Giggle","Grumble","A-60","A-120","Monument","Bramble","Groundskeeper",
+               "Sally","Jeff the Killer","Gloombat Swarm","Halt","Dread","Timothy","Custom Entity","Frozen Ambush" },
+    Multi = true, AllowNull = true, Default = {},
 })
+
+local function IsEntitySelected(alias)
+    local opts = Options.EntityESPOptions
+    if not opts or not opts.Value then return false end
+    if opts.Value["All"] then return true end
+    return opts.Value[alias] == true
+end
+
+local function AddEntityESP(ent)
+    if not ent or not ent.Parent then return end
+    local alias = EntityAlias[ent.Name]
+    if not alias then return end
+    if not IsEntitySelected(alias) then return end
+    if EntityESPObjects[ent] then return end
+    local target = ResolveEntityTarget(ent)
+    if not target then return end
+    Abysall.ESPLibrary:AddESP({ Object = target, Text = alias, Color = EntityColor })
+    EntityESPObjects[ent] = target
+end
+
 ESP_Tab:AddToggle('EntityESPToggleMain', { Text = "Entities", Default = false,
     Callback = function(v)
         if v then
             for _, ent in ipairs(workspace:GetChildren()) do
-                local lbl = EntityAlias[ent.Name]
-                if lbl then
-                    Abysall.ESPLibrary:AddESP({ Object = ent, Text = lbl, Color = EntityColor })
-                    EntityESPObjects[ent] = true
+                AddEntityESP(ent)
+            end
+            for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
+                for _, ent in ipairs(room:GetDescendants()) do
+                    if EntityAlias[ent.Name] then AddEntityESP(ent) end
                 end
             end
         else
-            for obj in pairs(EntityESPObjects) do Abysall.ESPLibrary:RemoveESP(obj) end
+            for ent, target in pairs(EntityESPObjects) do
+                Abysall.ESPLibrary:RemoveESP(target)
+            end
             EntityESPObjects = {}
         end
     end
 }):AddColorPicker('EntityESPColor', { Default = EntityColor, Title = 'Entity Color', Transparency = 0,
-    Callback = function(v) EntityColor = v; for obj in pairs(EntityESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end end
+    Callback = function(v)
+        EntityColor = v
+        for _, target in pairs(EntityESPObjects) do
+            Abysall.ESPLibrary:UpdateObjectColor(target, v)
+        end
+    end
 })
+
+-- React to filter changes
+Options.EntityESPOptions:OnChanged(function()
+    if not Toggles.EntityESPToggleMain.Value then return end
+    -- clear all and re-add based on new filter
+    for ent, target in pairs(EntityESPObjects) do
+        Abysall.ESPLibrary:RemoveESP(target)
+    end
+    EntityESPObjects = {}
+    for _, ent in ipairs(workspace:GetChildren()) do AddEntityESP(ent) end
+    for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
+        for _, ent in ipairs(room:GetDescendants()) do
+            if EntityAlias[ent.Name] then AddEntityESP(ent) end
+        end
+    end
+end)
+
+-- Live add
 table.insert(Connections, workspace.ChildAdded:Connect(function(v)
     if not Toggles.EntityESPToggleMain.Value then return end
-    local lbl = EntityAlias[v.Name]
-    if lbl then
-        task.wait(0.3)
-        Abysall.ESPLibrary:AddESP({ Object = v, Text = lbl, Color = EntityColor })
-        EntityESPObjects[v] = true
-    end
+    AddEntityESP(v)
+end))
+table.insert(Connections, workspace.DescendantAdded:Connect(function(v)
+    if not Toggles.EntityESPToggleMain.Value then return end
+    task.wait(0.15)
+    if v and v.Parent and EntityAlias[v.Name] then AddEntityESP(v) end
 end))
 table.insert(Connections, workspace.ChildRemoved:Connect(function(v)
-    if EntityESPObjects[v] then Abysall.ESPLibrary:RemoveESP(v); EntityESPObjects[v] = nil end
+    if EntityESPObjects[v] then
+        Abysall.ESPLibrary:RemoveESP(EntityESPObjects[v])
+        EntityESPObjects[v] = nil
+    end
+end))
+table.insert(Connections, workspace.DescendantRemoving:Connect(function(v)
+    if EntityESPObjects[v] then
+        Abysall.ESPLibrary:RemoveESP(EntityESPObjects[v])
+        EntityESPObjects[v] = nil
+    end
 end))
 
 -- AUTO-RESCAN
@@ -2217,9 +2057,12 @@ task.spawn(function()
                 if rn and (rn == cr or rn == cr + 1) then
                     for _, obj in ipairs(room:GetDescendants()) do
                         local label = ItemList[obj.Name]
-                        if label and obj:IsA("Model") and obj.PrimaryPart and not ItemsESPObjects[obj] and not isOwned(obj) then
-                            Abysall.ESPLibrary:AddESP({ Object = obj, Text = label, Color = ItemsColor })
-                            ItemsESPObjects[obj] = true
+                        if label and not isPlayerOwnedItem(obj) then
+                            local target = ResolveItemTarget(obj)
+                            if target and not ItemsESPObjects[target] then
+                                Abysall.ESPLibrary:AddESP({ Object = target, Text = label, Color = ItemsColor })
+                                ItemsESPObjects[target] = true
+                            end
                         end
                     end
                 end
@@ -2288,7 +2131,7 @@ NotifyBox:AddToggle('NotifyItemsToggle', { Text = "Notify Items", Default = fals
 NotifyBox:AddToggle('NotifyItemsShowDistance', { Text = "Show Distance", Default = false })
 NotifyBox:AddDivider()
 
--- ⭐ HIDING TIMER (fixed — Abysall style)
+-- ⭐ HIDING TIMER
 local hidingTimeConnection = nil
 local hideMonsterHook = nil
 local hidingAttributeConnection = nil
@@ -2412,7 +2255,6 @@ table.insert(Connections, workspace.DescendantAdded:Connect(function(obj)
     if not Toggles.NotifyItemsToggle or not Toggles.NotifyItemsToggle.Value then return end
     task.wait(0.25)
     if not obj or not obj.Parent then return end
-    if not obj:IsA("Model") then return end
     local label = ItemsData[obj.Name]
     if not label then return end
     if obj.Parent.Name == "Drops" then return end
@@ -2896,6 +2738,55 @@ Toggles.AntiBanana:OnChanged(function(v)
     end
 end)
 
+-- ⭐ Anti Surge MOVED here (Floors -> Modifiers)
+local AntiSurgeApplied = false
+local function IsOutdoors()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = { char }
+    local result = workspace:Raycast(hrp.Position, Vector3.new(0, 300, 0), params)
+    return result == nil
+end
+
+local function ApplyAntiSurgeState(active)
+    if not FakeEvents.Surge_Real then
+        FakeEvents.Surge_Real = RemoteFolder:FindFirstChild("SurgeRemote")
+    end
+    if not FakeEvents.Surge_Real then return end
+    if active and not AntiSurgeApplied then
+        FakeEvents.Surge.Parent = RemoteFolder
+        FakeEvents.Surge_Real.Parent = ReplicatedStorage
+        AntiSurgeApplied = true
+    elseif not active and AntiSurgeApplied then
+        FakeEvents.Surge_Real.Parent = RemoteFolder
+        FakeEvents.Surge.Parent = ReplicatedStorage
+        AntiSurgeApplied = false
+    end
+end
+
+FloorsModifiers:AddToggle('NoSurgeDamage', {
+    Text = "Anti Surge (outdoors only)",
+    Default = false,
+    Tooltip = "Only swaps the Surge remote while you are outdoors."
+})
+Toggles.NoSurgeDamage:OnChanged(function(v)
+    if not v then
+        ApplyAntiSurgeState(false)
+    end
+end)
+task.spawn(function()
+    while task.wait(0.5) do
+        if Library.Unloaded then break end
+        if Toggles.NoSurgeDamage and Toggles.NoSurgeDamage.Value then
+            ApplyAntiSurgeState(IsOutdoors())
+        end
+    end
+end)
+
 FloorsModifiers:AddToggle('AntiJam', { Text = "Anti Jamming", Default = false,
     Callback = function(v)
         local mt = SoundService:FindFirstChild("Main")
@@ -2944,27 +2835,12 @@ do
                         local args = {...}; args[1] = true
                         return original(self, unpack(args))
                     end
-                    if self.Name == "Crouch" and cogAlt then
-                        local args = {...}
-                        if cogAlt then args[1] = true end
-                        return original(self, unpack(args))
-                    end
-                end
-                if method == "Fire" and isI and self.Name == "FireToolProjectile" and (noSpread or fastThrow) then
-                    local args = {...}
-                    if noSpread then
-                        args[3] = workspace.CurrentCamera.CFrame.Position
-                        args[4] = workspace.CurrentCamera.CFrame.LookVector
-                    end
-                    if fastThrow then args[5] = 500 end
-                    return original(self, unpack(args))
                 end
                 return original(self, ...)
             end))
-            hookNamecall = original
         end)
-        if not ok then LogErr("Hook failed: " .. tostring(err)); hookNamecall = nil
-        else LogOk("Hook installed") end
+        if not ok then LogErr("Hook failed: " .. tostring(err)) end
+        LogOk("Hook installed")
     else LogWarn("No hookmetamethod") end
 end
 
@@ -3166,8 +3042,8 @@ function Unload()
         "ABF","AntiKillbricks","TeleportToNextRoom","AntiVacuum","AntiLookman",
         "AntiDupe","AntiGloombatEggs","AntiGiggle","AntiJeff","AntiBanana",
         "AntiSeekObstructions","AntiSeekingWall","NoSurgeDamage","NoPuzzleDoors",
-        "CrouchSpoof","VelocityManipulation","AntiA90","AntiJam","AntiGloomPile",
-        "DoorSkipper","DisableMinesEcho","CollisionOffsetGodmodeAlt","NoSpread","FastThrow",
+        "CrouchSpoof","AntiA90","AntiJam","AntiGloomPile",
+        "DoorSkipper","DisableMinesEcho","NoSpread","FastThrow",
         "Freecam","NoWardrobeVignette","RemoveAmbience","ReplaceGLwG",
         "AntiGroundskeeper","AnticheatManipulation","PhantomNoclip","AntiEyes",
         "RemoveDRONESTAMPEDE","Door","HidingSpotESP","Chest","Items","GoldESP","Players",
