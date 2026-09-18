@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  BITICAL HUB — Full feature set with Abysall-style ESP + notifications
+--  BITICAL HUB — Abysall ESP + Notifications + Hiding Timer + Figure GM
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ═══════════ DEBUG CONSOLE ═══════════
@@ -15,10 +15,8 @@ local DebugWindow = (function()
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.Parent = parent
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 340, 0, 220)
-    frame.Position = UDim2.new(0, 10, 0, 10)
-    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    frame.BorderSizePixel = 0
+    frame.Size = UDim2.new(0, 340, 0, 220); frame.Position = UDim2.new(0, 10, 0, 10)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25); frame.BorderSizePixel = 0
     frame.Active = true; frame.Draggable = true; frame.Parent = gui
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
     local title = Instance.new("TextLabel")
@@ -59,9 +57,9 @@ local DebugWindow = (function()
         l.Parent = scroll
     end
     return {
-        Log   = function(t) addEntry(t, Color3.fromRGB(200, 200, 200)) end,
-        Ok    = function(t) addEntry(t, Color3.fromRGB(73, 230, 133)) end,
-        Warn  = function(t) addEntry(t, Color3.fromRGB(255, 200, 60)) end,
+        Log = function(t) addEntry(t, Color3.fromRGB(200, 200, 200)) end,
+        Ok = function(t) addEntry(t, Color3.fromRGB(73, 230, 133)) end,
+        Warn = function(t) addEntry(t, Color3.fromRGB(255, 200, 60)) end,
         Error = function(t) addEntry(t, Color3.fromRGB(255, 80, 80)) end,
         Gui = gui,
     }
@@ -173,9 +171,9 @@ Achievement = (function()
 end)()
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- ABYSALL-STYLE ESP LIBRARY (complete API matching Abysall.ESPLibrary)
+-- ABYSALL-STYLE ESP LIBRARY (unified — all ESPs use this)
 -- ═══════════════════════════════════════════════════════════════════════════
-Log("Building Abysall-style ESP library...")
+Log("Building Abysall ESP library...")
 
 local AbysallESPLibrary = (function()
     local Registry = {}
@@ -190,7 +188,6 @@ local AbysallESPLibrary = (function()
         Arrows = false, ArrowRadius = 250, DistanceSizeRatio = 0.8,
     }
     local RainbowHue = 0
-
     local function GetGui()
         local parent
         local ok = pcall(function() parent = game:GetService("CoreGui") end)
@@ -198,16 +195,13 @@ local AbysallESPLibrary = (function()
         local gui = parent:FindFirstChild("AbysallESPGui")
         if not gui then
             gui = Instance.new("ScreenGui")
-            gui.Name = "AbysallESPGui"
-            gui.ResetOnSpawn = false
-            gui.IgnoreGuiInset = true
-            gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            gui.Name = "AbysallESPGui"; gui.ResetOnSpawn = false
+            gui.IgnoreGuiInset = true; gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
             gui.Parent = parent
         end
         return gui
     end
     local ScreenGui = GetGui()
-
     local function GetWorldPos(obj)
         if not obj then return nil end
         if obj:IsA("BasePart") then return obj.Position end
@@ -224,7 +218,6 @@ local AbysallESPLibrary = (function()
         if not hrp or not pos then return 0 end
         return (hrp.Position - pos).Magnitude
     end
-
     task.spawn(function()
         while task.wait(0.05) do
             if game:GetService("Players").LocalPlayer:GetAttribute("SapphireLoaded") == nil then break end
@@ -233,17 +226,14 @@ local AbysallESPLibrary = (function()
                 for _, d in pairs(Registry) do
                     if d.Highlight and d.Highlight.Parent then
                         local c = Color3.fromHSV(RainbowHue, 1, 1)
-                        d.Highlight.FillColor = c
-                        d.Highlight.OutlineColor = c
+                        d.Highlight.FillColor = c; d.Highlight.OutlineColor = c
                         if d.Label then d.Label.TextColor3 = c end
                     end
                 end
             end
         end
     end)
-
     local API = {}
-
     function API:AddESP(options)
         local object = options.Object
         if not object or not object.Parent then return end
@@ -253,46 +243,30 @@ local AbysallESPLibrary = (function()
         local text = options.Text or object.Name
         ColorTable[object] = color
         local h = Instance.new("Highlight")
-        h.Name = "AbysallESPHighlight"
-        h.Adornee = object
-        h.FillColor = color
-        h.FillTransparency = Config.FillTransparency
-        h.OutlineColor = color
-        h.OutlineTransparency = Config.OutlineTransparency
-        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        h.Parent = object
+        h.Name = "AbysallESPHighlight"; h.Adornee = object
+        h.FillColor = color; h.FillTransparency = Config.FillTransparency
+        h.OutlineColor = color; h.OutlineTransparency = Config.OutlineTransparency
+        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; h.Parent = object
         local bb = Instance.new("BillboardGui")
-        bb.Name = "AbysallESPLabel"
-        bb.Adornee = object
-        bb.AlwaysOnTop = true
-        bb.Size = UDim2.fromOffset(200, 30)
-        bb.StudsOffset = Vector3.new(0, 2, 0)
-        bb.MaxDistance = 1000
+        bb.Name = "AbysallESPLabel"; bb.Adornee = object
+        bb.AlwaysOnTop = true; bb.Size = UDim2.fromOffset(200, 30)
+        bb.StudsOffset = Vector3.new(0, 2, 0); bb.MaxDistance = 1000
         bb.Parent = object
         local l = Instance.new("TextLabel")
-        l.BackgroundTransparency = 1
-        l.Size = UDim2.fromScale(1, 1)
-        l.Text = text
-        l.TextColor3 = color
-        l.TextStrokeColor3 = Color3.fromRGB(0,0,0)
-        l.TextStrokeTransparency = Config.TextOutlineTransparency
-        l.TextTransparency = Config.TextTransparency
-        l.TextSize = Config.TextSize
-        l.Font = Config.Font
-        l.TextXAlignment = Enum.TextXAlignment.Center
-        l.TextYAlignment = Enum.TextYAlignment.Center
-        l.Parent = bb
+        l.BackgroundTransparency = 1; l.Size = UDim2.fromScale(1, 1)
+        l.Text = text; l.TextColor3 = color
+        l.TextStrokeColor3 = Color3.fromRGB(0,0,0); l.TextStrokeTransparency = Config.TextOutlineTransparency
+        l.TextTransparency = Config.TextTransparency; l.TextSize = Config.TextSize
+        l.Font = Config.Font; l.TextXAlignment = Enum.TextXAlignment.Center
+        l.TextYAlignment = Enum.TextYAlignment.Center; l.Parent = bb
         Registry[object] = { Highlight = h, Billboard = bb, Label = l, BaseText = text, Color = color }
     end
-
     function API:RemoveESP(object)
         local d = Registry[object]; if not d then return end
         if d.Highlight then d.Highlight:Destroy() end
         if d.Billboard then d.Billboard:Destroy() end
-        Registry[object] = nil
-        ColorTable[object] = nil
+        Registry[object] = nil; ColorTable[object] = nil
     end
-
     function API:UpdateObjectColor(object, color)
         local d = Registry[object]; if not d then return end
         d.Color = color; ColorTable[object] = color
@@ -301,7 +275,6 @@ local AbysallESPLibrary = (function()
             d.Label.TextColor3 = color
         end
     end
-
     function API:SetRainbow(v) Config.Rainbow = v end
     function API:SetShowDistance(v) Config.ShowDistance = v end
     function API:SetFillTransparency(v) Config.FillTransparency = v end
@@ -327,7 +300,6 @@ local AbysallESPLibrary = (function()
         for obj in pairs(Registry) do pcall(function() API:RemoveESP(obj) end) end
         if ScreenGui then pcall(function() ScreenGui:Destroy() end) end
     end
-
     task.spawn(function()
         while task.wait(0.1) do
             if game:GetService("Players").LocalPlayer:GetAttribute("SapphireLoaded") == nil then break end
@@ -354,7 +326,6 @@ local AbysallESPLibrary = (function()
             end
         end
     end)
-
     return {
         AddESP = function(self, o) return API:AddESP(o) end,
         RemoveESP = function(self, o) return API:RemoveESP(o) end,
@@ -387,7 +358,6 @@ LogOk("Abysall ESP library built")
 -- ═══════════ LIBRARY ═══════════
 Log("Loading UI library...")
 Pathnode = Instance.new("Folder", Workspace); Pathnode.Name = "Path Node"
-
 local repo = (UIStyle == "LinoriaLib")
     and 'https://raw.githubusercontent.com/mstudio45/LinoriaLib/main/'
     or  'https://raw.githubusercontent.com/mstudio45/Obsidian/main/'
@@ -396,7 +366,6 @@ Executor = executorSuccess and executorResult or "Unknown"
 local libSuccess, libResult = pcall(function() return loadstring(game:HttpGet(repo..'Library.lua'))() end)
 if libSuccess then Library = libResult else LogErr("UI library failed"); return end
 LogOk("Library loaded")
-
 pcall(function()
     ThemeManager = loadstring(game:HttpGet(repo..'addons/ThemeManager.lua'))()
     SaveManager  = loadstring(game:HttpGet(repo..'addons/SaveManager.lua'))()
@@ -482,7 +451,7 @@ LogOk("Groupboxes created")
 
 Tabs.Homepage:UpdateWarningBox({
     Title = "Changelog:",
-    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Full Abysall ESP library\nAbysall notifications\nRestored: InfiniteItems, Crucifix, FOV, AntiDupe, AntiScreech, TaskESP, ItemESP, GoldESP, PlayerESP, StardustESP</font>",
+    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Abysall ESP library (unified)\nAbysall SpeedBypass\nHiding timer fixed\nFigure Godmode restored</font>",
     IsNormal = true, Visible = true, LockSize = true,
 })
 
@@ -538,10 +507,6 @@ if Floor and Floor:IsA("StringValue") then
         pcall(function() floorNameLabel:SetText("Current Floor: " .. tostring(Floor.Value)) end)
     end))
 end
-Info:AddDivider()
-Info:AddButton({ Text = "Test Debug Console", Func = function()
-    LogOk("Test OK"); LogWarn("Test Warn"); LogErr("Test Error")
-end })
 
 -- ═══════════ MOVEMENT ═══════════
 Speed = 15
@@ -618,7 +583,6 @@ end))
 
 Movement:AddToggle('Noacceleration', { Text = "No Acceleration", Default = false })
 Movement:AddDivider()
-
 Movement:AddToggle('InstantPrompt', { Text = "Instant Interaction", Default = false,
     Callback = function(v)
         for _, p in ipairs(workspace.CurrentRooms:GetDescendants()) do
@@ -632,7 +596,7 @@ Movement:AddToggle('InstantPrompt', { Text = "Instant Interaction", Default = fa
 Movement:AddToggle('NoClosetExitDelay', { Text = "No Exit Closet Delay", Default = false })
 Movement:AddToggle('AntiAfk', { Text = "Anti AFK", Default = false })
 table.insert(Connections, LocalPlayer.Idled:Connect(function()
-    if Toggles.AntiAfk.Value then VirtualUser:CaptureController() VirtualUser:ClickButton2(Vector2.new()) end
+    if Toggles.AntiAfk.Value then VirtualUser:CaptureController(); VirtualUser:ClickButton2(Vector2.new()) end
 end))
 Movement:AddDivider()
 
@@ -794,7 +758,6 @@ Automation:AddToggle('AutoInteract', { Text = "Auto Interact", Default = false,
 }):AddKeyPicker('AutoInteractKeybind', { Default='R', SyncToggleState=true, Mode='Toggle', Text='Auto Interact', NoUI=false, Callback=function() end, ChangedCallback=function() end })
 Automation:AddDropdown("IgnoreList", { Values={"Jeff Items","Coins","Candy","Dropped Items","Glitch Cube","Death Candy"}, Default=1, Multi=true, Text="Ignore List", Callback=function() end })
 Automation:AddDivider()
-
 Automation:AddToggle('AutoHeartbeatMiniGame', { Text = "Auto Heartbeat Mini Game", Default = false, Disabled = not hookmetamethod })
 
 local PL = nil; local UnlockDistance = 40
@@ -1033,26 +996,16 @@ Anti:AddToggle('AntiHalt', { Text = "Anti Halt", Default = false,
         if H then H.Name = v and "_Shade" or "Shade" end
     end
 })
-
--- ⭐ Anti Screech (RESTORED — was broken before)
-Anti:AddToggle('AntiScreech', {
-    Text = "Anti Screech", Default = false,
-    Tooltip = "Prevents 'Screech' from spawning/hurting you.",
+Anti:AddToggle('AntiScreech', { Text = "Anti Screech", Default = false,
     Callback = function(v)
         local S = Modules:FindFirstChild("Screech") or Modules:FindFirstChild("_Screech")
         if S then S.Name = v and "_Screech" or "Screech" end
     end
 })
 table.insert(Connections, workspace.CurrentCamera.ChildAdded:Connect(function(c)
-    if c.Name == "GlitchScreech" and Toggles.AntiScreech and Toggles.AntiScreech.Value then
-        c:Destroy()
-    end
+    if c.Name == "GlitchScreech" and Toggles.AntiScreech and Toggles.AntiScreech.Value then c:Destroy() end
 end))
-
--- ⭐ Anti Dupe (RESTORED — was broken before)
-Anti:AddToggle('AntiDupe', {
-    Text = "Anti Dupe", Default = false,
-    Tooltip = "Prevents 'Dupe' fake doors from trapping you.",
+Anti:AddToggle('AntiDupe', { Text = "Anti Dupe", Default = false,
     Callback = function(v)
         for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
             for _, o in ipairs(room:GetDescendants()) do
@@ -1069,7 +1022,6 @@ Anti:AddToggle('AntiDupe', {
         end
     end
 })
-
 Anti:AddToggle('AntiEyes', { Text = "Anti Eyes / Lookman", Default = false })
 table.insert(Connections, workspace.ChildAdded:Connect(function(v)
     if (v.Name == "Eyes" or v.Name == "Lookman") and Toggles.AntiEyes and Toggles.AntiEyes.Value then
@@ -1088,7 +1040,6 @@ table.insert(Connections, workspace.ChildAdded:Connect(function(v)
         end)
     end
 end))
-
 Anti:AddToggle('AntiSnare', { Text = "Anti Snare", Default = false,
     Callback = function(v)
         for _, o in ipairs(workspace.CurrentRooms:GetDescendants()) do
@@ -1114,55 +1065,123 @@ task.spawn(function()
     end
 end)
 
+-- ⭐ ABYSALL SPEED BYPASS (exact port)
 SpeedBypassInterval = 0.216
-Bypass:AddDropdown("SpeedBypassMethod", { Values={"Mass Switch","Network Sleep"}, Default=1, Multi=false, Text="Speed Bypass Mode",
-    Callback = function(v)
-        if Toggles.SpeedBypass.Value then
-            if v == "Mass Switch" then Options.SpeedBoostSlider:SetMax(100); Options.FlySpeed:SetMax(100)
-            elseif v == "Network Sleep" then Options.SpeedBoostSlider:SetMax(150); Options.FlySpeed:SetMax(150) end
+Bypass:AddDropdown("SpeedBypassMethod", {
+    Values = {"Mass Switch", "Network Sleep"}, Default = 1, Multi = false, Text = "Speed Bypass Mode",
+    Callback = function(Value)
+        if Toggles.SpeedBypass and Toggles.SpeedBypass.Value then
+            if Value == "Mass Switch" then
+                Options.SpeedBoostSlider:SetMax(100)
+                Options.FlySpeed:SetMax(100)
+            elseif Value == "Network Sleep" then
+                Options.SpeedBoostSlider:SetMax(150)
+                Options.FlySpeed:SetMax(150)
+            end
         end
     end,
 })
-Bypass:AddToggle('SpeedBypass', { Text = "Speed Bypass", Default = false,
-    Callback = function(v)
-        if v then
+Bypass:AddToggle('SpeedBypass', {
+    Text = "Speed Bypass",
+    Default = false,
+    Callback = function(Value)
+        if Value then
             if Options.SpeedBypassMethod.Value == "Network Sleep" and not sethiddenproperty then
-                Library:Notify("Network Sleep needs sethiddenproperty", 5); Toggles.SpeedBypass:SetValue(false); return
+                Library:Notify("Network Sleep mode unavailable, executor lacks Sethiddenproperty", 5)
+                Toggles.SpeedBypass:SetValue(false)
+                return
             end
-            if Options.SpeedBypassMethod.Value == "Mass Switch" then Options.SpeedBoostSlider:SetMax(100)
-            elseif Options.SpeedBypassMethod.Value == "Network Sleep" then Options.SpeedBoostSlider:SetMax(150) end
-            Options.SpeedBoostSlider:SetValue(v and Options.SpeedBoostSlider.Value or 21)
-            Options.FlySpeed:SetMax(v and 100 or 21)
+            if Options.SpeedBypassMethod.Value == "Mass Switch" then
+                Options.SpeedBoostSlider:SetMax(100)
+            elseif Options.SpeedBypassMethod.Value == "Network Sleep" then
+                Options.SpeedBoostSlider:SetMax(150)
+            end
+            Options.SpeedBoostSlider:SetValue(Value and Options.SpeedBoostSlider.Value or 21)
+            Options.FlySpeed:SetMax(Value and 100 or 21)
+            Options.FlySpeed:SetValue(Value and Options.FlySpeed.Value or 21)
             task.spawn(function()
                 while Toggles.SpeedBypass.Value do
                     task.wait(SpeedBypassInterval)
                     if alive then
                         if Options.SpeedBypassMethod.Value == "Mass Switch" then
-                            local cc1 = LocalPlayer.Character:FindFirstChild("_CollisionPart")
-                            local cc2 = LocalPlayer.Character:FindFirstChild("_CollisionPart2")
-                            if cc1 and cc2 then
-                                if Character.CollisionPart.Anchored or nothitted then
-                                    cc1.Massless = true; cc2.Massless = true; task.wait(0.35)
+                            local CollisionClon = LocalPlayer.Character:FindFirstChild("_CollisionPart")
+                            local CollisionClon2 = LocalPlayer.Character:FindFirstChild("_CollisionPart2")
+                            if CollisionClon and CollisionClon2 then
+                                if Character.CollisionPart.Anchored or nothitted or (Toggles.AnticheatManipulation and Toggles.AnticheatManipulation.Value) then
+                                    CollisionClon.Massless = true
+                                    CollisionClon2.Massless = true
+                                    task.wait(0.35)
                                 else
-                                    cc1.Massless = true; cc2.Massless = true
+                                    CollisionClon.Massless = true
+                                    CollisionClon2.Massless = true
                                     task.wait(SpeedBypassInterval)
-                                    cc2.Massless = false; cc1.Massless = false
+                                    CollisionClon2.Massless = false
+                                    CollisionClon.Massless = false
                                 end
                             end
                         end
                     end
                     task.wait(0.01)
                 end
+                if alive and Character:FindFirstChild("_CollisionPart") and Character:FindFirstChild("_CollisionPart2") then
+                    Character:FindFirstChild("_CollisionPart").Massless = true
+                    Character:FindFirstChild("_CollisionPart2").Massless = true
+                end
             end)
         else
-            Options.SpeedBoostSlider:SetMax(21); Options.SpeedBoostSlider:SetValue(21)
-            Options.FlySpeed:SetMax(21); Options.FlySpeed:SetValue(21)
+            Options.SpeedBoostSlider:SetMax(21)
+            Options.SpeedBoostSlider:SetValue(21)
+            Options.FlySpeed:SetMax(21)
+            Options.FlySpeed:SetValue(21)
         end
     end,
 })
-Bypass:AddSlider("SpeedBypassInternal", { Text = "Speed Bypass Interval", Default = 0.216, Min = 0.2, Max = 0.23, Rounding = 2, Compact = false,
-    Callback = function(v) SpeedBypassInterval = v end })
+Bypass:AddSlider("SpeedBypassInternal", {
+    Text = "Speed Bypass Interval", Default = 0.216, Min = 0.2, Max = 0.23, Rounding = 2, Compact = false,
+    Callback = function(Value) SpeedBypassInterval = Value end,
+})
 Bypass:AddDivider()
+
+-- Abysall Network Sleep background handler
+task.spawn(function()
+    while task.wait() do
+        if Library.Unloaded then break end
+        if Toggles.SpeedBypass and Toggles.SpeedBypass.Value
+           and Options.SpeedBypassMethod and Options.SpeedBypassMethod.Value == "Network Sleep" then
+            if sethiddenproperty then
+                local cc1 = LocalPlayer.Character:FindFirstChild("_CollisionPart")
+                local cc2 = LocalPlayer.Character:FindFirstChild("_CollisionPart2")
+                if cc1 and not cc1.Massless then cc1.Massless = true end
+                if cc2 and not cc2.Massless then cc2.Massless = true end
+                SetProperty = sethiddenproperty
+                if alive then
+                    local loop = RunService.RenderStepped:Connect(function()
+                        if Toggles.SpeedBypass.Value and Options.SpeedBypassMethod.Value == "Network Sleep" then
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
+                            task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
+                            task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
+                            task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
+                            task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
+                            task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
+                            task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
+                            task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
+                            task.wait()
+                        end
+                    end)
+                    task.wait()
+                    if loop then loop:Disconnect() end
+                end
+            end
+        end
+    end
+end)
 
 local GodModeCameraHandler = { enabled = false }
 local function GodModeCameraStep()
@@ -1306,16 +1325,15 @@ Bypass:AddDivider()
 Bypass:AddToggle('UseToolsAnyWhere', { Text = "Use Tools Anywhere", Default = false,
     Callback = function(v) RequiredMainGame.canUseItems = v end })
 
--- ⭐ INFINITE ITEMS (RESTORED)
+-- INFINITE ITEMS
 local Disable3 = false
 local Prompt = Instance.new("ProximityPrompt", workspace); Prompt.Name = "TestPrompt"
 pcall(function() return fireproximityprompt(Prompt) end); Prompt:Destroy()
-local LockpickParents = { ChestBoxLocked = true, Locker_Small_Locked = true, Toolbox_Locked = true }
+local LockpickParents = { ChestBoxLocked=true, Locker_Small_Locked=true, Toolbox_Locked=true }
 local LockpickNames = { UnlockPrompt=true, ThingToEnable=true, LockPrompt=true, SkullPrompt=true, FusesPrompt=true }
-local ShearsParents = { Chest_Vine = true, CuttableVines = true, Cellar = true }
-local ShearsNames = { SkullPrompt = true }
+local ShearsParents = { Chest_Vine=true, CuttableVines=true, Cellar=true }
+local ShearsNames = { SkullPrompt=true }
 local InfStore, InfSStore = {}, {}
-
 local function scanPrompts(vp, vn)
     local t = {}
     for _, v in ipairs(workspace.CurrentRooms:GetDescendants()) do
@@ -1413,7 +1431,6 @@ Bypass:AddToggle('InfiniteSItems', { Text = "Infinite Shears", Default = false,
     end
 })
 
--- ⭐ INFINITE CRUCIFIX (RESTORED)
 local raycastParms = RaycastParams.new()
 raycastParms.FilterDescendantsInstances = { LocalPlayer.Character }
 raycastParms.FilterType = Enum.RaycastFilterType.Blacklist
@@ -1461,7 +1478,7 @@ Bypass:AddToggle('InfiniteCrucifix', { Text = "Infinite Crucifix", Default = fal
         end
     end
 })
-LogOk("Bypass + InfiniteItems + Crucifix done")
+LogOk("Bypass done")
 
 -- ═══════════ UNIVERSAL ═══════════
 ExploitsUniversal:AddButton({ Text = "Bring Drops (FE)", DoubleClick = false, Func = function()
@@ -1552,6 +1569,54 @@ task.spawn(function()
     end
 end)
 
+-- ⭐ FIGURE GODMODE (RESTORED — Floors 1 & 2)
+ExploitsUniversal:AddToggle('FigureGodmode', {
+    Text = "Figure Godmode (Floors 1 & 2)", Default = false,
+    Tooltip = "Prevents 'Figure' from hurting you on Hotel and Mines floors."
+})
+do
+    local FigureRigs = {}
+    local CurrentRoomsRef = workspace:WaitForChild("CurrentRooms", 10)
+    if CurrentRoomsRef then
+        local function addFigure(figure)
+            if figure.Name == "FigureRig" and figure:FindFirstChild("Root") then
+                table.insert(FigureRigs, figure)
+            end
+        end
+        for _, gs in CurrentRoomsRef:GetDescendants() do addFigure(gs) end
+        CurrentRoomsRef.DescendantAdded:Connect(addFigure)
+        CurrentRoomsRef.DescendantRemoving:Connect(function(figure)
+            local found = table.find(FigureRigs, figure)
+            if found then table.remove(FigureRigs, found) end
+        end)
+    end
+    local function ShouldSpoof(hrp)
+        if not (Toggles.FigureGodmode and Toggles.FigureGodmode.Value) then return false end
+        for _, figure in FigureRigs do
+            local root = figure:FindFirstChild("Root")
+            if root and (root.Position * Vector3.new(1, 0, 1) - hrp.Position * Vector3.new(1, 0, 1)).Magnitude < 25 then
+                return true
+            end
+        end
+        return false
+    end
+    local FigureCamera = workspace.CurrentCamera
+    workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+        FigureCamera = workspace.CurrentCamera or FigureCamera
+    end)
+    RunService.Heartbeat:Connect(function()
+        if not (Toggles.FigureGodmode and Toggles.FigureGodmode.Value) then return end
+        local character = LocalPlayer.Character
+        local hrp = character and character:FindFirstChild("HumanoidRootPart")
+        if hrp and ShouldSpoof(hrp) then
+            hrp.CFrame *= CFrame.new(0, 9.5, 0)
+            RunService.RenderStepped:Wait()
+            hrp.CFrame *= CFrame.new(0, -9.5, 0)
+            FigureCamera.CFrame -= Vector3.new(0, 9.5, 0)
+        end
+    end)
+end
+
 ExploitsUniversal:AddToggle('AntiSeekObstructions', {
     Text = "Anti Seek Obstructions (Floors 1 & 2)", Default = false,
     Callback = function(v)
@@ -1600,18 +1665,14 @@ Troll:AddToggle('ThinkingAnimation', { Text = 'Thinking Animation', Default = fa
     end
 })
 
--- ═══════════ ESP SYSTEM (uses Abysall.ESPLibrary) ═══════════
+-- ═══════════ ESP SYSTEM (all using Abysall.ESPLibrary) ═══════════
 Log("Building ESP toggles...")
 
-ESP_Settings:AddToggle('RainbowESP', { Text = 'Rainbow ESP', Default = false,
-    Callback = function(v) Abysall.ESPLibrary:SetRainbow(v) end })
-ESP_Settings:AddToggle('ESPShowDistance', { Text = "Show Distance", Default = true,
-    Callback = function(v) Abysall.ESPLibrary:SetShowDistance(v) end })
-ESP_Settings:AddToggle('GlobalTracerEnabled', { Text = "Tracers", Default = false,
-    Callback = function(v) Abysall.ESPLibrary:SetTracers(v) end })
-ESP_Settings:AddToggle('GlobalArrowsEnabled', { Text = "Arrows", Default = false,
-    Callback = function(v) Abysall.ESPLibrary:SetArrows(v) end })
-ESP_Settings:AddSlider('GlobalTextSize', { Text = "Text Size", Default = 16, Min = 10, Max = 50, Rounding = 0, Compact = true,
+ESP_Settings:AddToggle('RainbowESP', { Text = 'Rainbow ESP', Default = false, Callback = function(v) Abysall.ESPLibrary:SetRainbow(v) end })
+ESP_Settings:AddToggle('ESPShowDistance', { Text = "Show Distance", Default = true, Callback = function(v) Abysall.ESPLibrary:SetShowDistance(v) end })
+ESP_Settings:AddToggle('GlobalTracerEnabled', { Text = "Tracers", Default = false, Callback = function(v) Abysall.ESPLibrary:SetTracers(v) end })
+ESP_Settings:AddToggle('GlobalArrowsEnabled', { Text = "Arrows", Default = false, Callback = function(v) Abysall.ESPLibrary:SetArrows(v) end })
+ESP_Settings:AddSlider('GlobalTextSize', { Text = "Text Size", Default = 20, Min = 10, Max = 50, Rounding = 0, Compact = true,
     Callback = function(v) Abysall.ESPLibrary:SetTextSize(v) end })
 ESP_Settings:AddSlider('GlobalOutlineTransparency', { Text = "Outline Transparency", Default = 0, Min = 0, Max = 1, Rounding = 2, Compact = true,
     Callback = function(v) Abysall.ESPLibrary:SetOutlineTransparency(v) end })
@@ -1630,10 +1691,9 @@ local function shouldShowESP(rn)
     return rn == cr or rn == cr + 1
 end
 
--- ⭐ DOOR ESP
+-- DOOR ESP
 local DoorColor = Color3.fromRGB(0, 200, 255)
 local DoorESPObjects = {}
-
 local function AddDoorESP(door, rn)
     if not door or not door.Parent then return end
     local model = door
@@ -1643,13 +1703,6 @@ local function AddDoorESP(door, rn)
     local txt = "Door " .. (door.Parent:GetAttribute("RoomID") or rn)
     Abysall.ESPLibrary:AddESP({ Object = model, Text = txt, Color = DoorColor })
     DoorESPObjects[model] = true
-end
-local function RemoveDoorESP(door)
-    local model = door
-    if door.Name == "Door" and door.Parent and door.Parent.Name == "Door" then model = door
-    elseif door:IsA("BasePart") and door.Parent and door.Parent:IsA("Model") then model = door.Parent end
-    Abysall.ESPLibrary:RemoveESP(model)
-    DoorESPObjects[model] = nil
 end
 ESP_Tab:AddToggle('Door', { Text = "Door", Default = false,
     Callback = function(v)
@@ -1668,10 +1721,7 @@ ESP_Tab:AddToggle('Door', { Text = "Door", Default = false,
         end
     end
 }):AddColorPicker('DoorColor', { Default = DoorColor, Title = 'Door Color', Transparency = 0,
-    Callback = function(v)
-        DoorColor = v
-        for model in pairs(DoorESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(model, v) end
-    end
+    Callback = function(v) DoorColor = v; for model in pairs(DoorESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(model, v) end end
 })
 table.insert(Connections, workspace.CurrentRooms.ChildAdded:Connect(function(room)
     if not Toggles.Door.Value then return end
@@ -1684,7 +1734,7 @@ table.insert(Connections, workspace.CurrentRooms.ChildAdded:Connect(function(roo
     end
 end))
 
--- ⭐ HIDING SPOTS ESP
+-- HIDING SPOTS ESP
 local HidingSpots = {
     Wardrobe="Wardrobe", Rooms_Locker="Wardrobe", Backdoor_Wardrobe="Wardrobe",
     Toolshed="Wardrobe", Locker_Large="Wardrobe", Bed="Bed", CircularVent="Vent",
@@ -1716,13 +1766,10 @@ ESP_Tab:AddToggle('HidingSpotESP', { Text = "Hiding Spots", Default = false,
         end
     end
 }):AddColorPicker('HidingSpotColorPicker', { Default = HidingSpotColor, Title = 'Hiding Spot Color', Transparency = 0,
-    Callback = function(v)
-        HidingSpotColor = v
-        for spot in pairs(HidingSpotESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(spot, v) end
-    end
+    Callback = function(v) HidingSpotColor = v; for spot in pairs(HidingSpotESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(spot, v) end end
 })
 
--- ⭐ CHEST ESP
+-- CHEST ESP
 local ChestColor = Color3.fromRGB(255, 255, 0)
 local ChestESPObjects = {}
 ESP_Tab:AddToggle('Chest', { Text = "Chest", Default = false,
@@ -1749,16 +1796,12 @@ ESP_Tab:AddToggle('Chest', { Text = "Chest", Default = false,
         end
     end
 }):AddColorPicker('ChestColor', { Default = ChestColor, Title = 'Chest Color', Transparency = 0,
-    Callback = function(v)
-        ChestColor = v
-        for obj in pairs(ChestESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end
-    end
+    Callback = function(v) ChestColor = v; for obj in pairs(ChestESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end end
 })
 
--- ⭐ TASK ESP (RESTORED)
+-- TASK ESP
 local TaskColor = Color3.fromRGB(0, 255, 0)
 local TaskESPObjects = {}
-
 ESP_Tab:AddToggle('TaskESP', { Text = "Tasks", Default = false,
     Callback = function(v)
         if v then
@@ -1776,32 +1819,20 @@ ESP_Tab:AddToggle('TaskESP', { Text = "Tasks", Default = false,
                     local key = room:FindFirstChild("KeyObtain", true)
                     if key and not key:GetAttribute("Used") then add(key, "Key") end
                     if rn == cr then
-                        for _, book in ipairs(room:GetDescendants()) do
-                            if book.Name == "LiveHintBook" then add(book, "Book") end
-                        end
-                        for _, breaker in ipairs(room:GetDescendants()) do
-                            if breaker.Name == "LiveBreakerPolePickup" then add(breaker, "Breaker Pole") end
-                        end
+                        for _, book in ipairs(room:GetDescendants()) do if book.Name == "LiveHintBook" then add(book, "Book") end end
+                        for _, breaker in ipairs(room:GetDescendants()) do if breaker.Name == "LiveBreakerPolePickup" then add(breaker, "Breaker Pole") end end
                     end
                     if Floor.Value == "Mines" then
                         for _, fuse in ipairs(room:GetDescendants()) do
                             if fuse.Name == "FuseObtain" and fuse.Parent and fuse.Parent.Name == "FuseHolder" then add(fuse, "Fuse") end
                         end
                         for _, anchor in ipairs(room:GetDescendants()) do
-                            if anchor.Name == "MinesAnchor" and anchor:FindFirstChild("Sign") then
-                                add(anchor, "Anchor " .. anchor.Sign.TextLabel.Text)
-                            end
+                            if anchor.Name == "MinesAnchor" and anchor:FindFirstChild("Sign") then add(anchor, "Anchor " .. anchor.Sign.TextLabel.Text) end
                         end
-                        for _, gen in ipairs(room:GetDescendants()) do
-                            if gen.Name == "GeneratorMain" then add(gen, "Generator") end
-                        end
-                        for _, pump in ipairs(room:GetDescendants()) do
-                            if pump.Name == "WaterPump" then add(pump, "Water Pump") end
-                        end
+                        for _, gen in ipairs(room:GetDescendants()) do if gen.Name == "GeneratorMain" then add(gen, "Generator") end end
+                        for _, pump in ipairs(room:GetDescendants()) do if pump.Name == "WaterPump" then add(pump, "Water Pump") end end
                         if rn == cr then
-                            for _, btn in ipairs(room:GetDescendants()) do
-                                if btn.Name == "MinesGateButton" then add(btn, "Gate Button") end
-                            end
+                            for _, btn in ipairs(room:GetDescendants()) do if btn.Name == "MinesGateButton" then add(btn, "Gate Button") end end
                         end
                     end
                     local lever = room:FindFirstChild("TimerLever", true)
@@ -1814,13 +1845,10 @@ ESP_Tab:AddToggle('TaskESP', { Text = "Tasks", Default = false,
         end
     end
 }):AddColorPicker('TaskColor', { Default = TaskColor, Title = 'Task Color', Transparency = 0,
-    Callback = function(v)
-        TaskColor = v
-        for obj in pairs(TaskESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end
-    end
+    Callback = function(v) TaskColor = v; for obj in pairs(TaskESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end end
 })
 
--- ⭐ ITEM ESP (RESTORED)
+-- ITEM ESP
 local ItemsColor = Color3.fromRGB(170, 0, 255)
 local ItemsESPObjects = {}
 local ItemList = {
@@ -1847,9 +1875,7 @@ local function isOwned(item)
                 local o = cur:FindFirstChild("Owner")
                 if o and o.Value then return true end
                 local par = cur.Parent
-                if par and (par:IsA("Backpack") or (par:IsA("Model") and Players:GetPlayerFromCharacter(par))) then
-                    return true
-                end
+                if par and (par:IsA("Backpack") or (par:IsA("Model") and Players:GetPlayerFromCharacter(par))) then return true end
             end
         end
         cur = cur.Parent
@@ -1887,13 +1913,10 @@ ESP_Tab:AddToggle('Items', { Text = "Items", Default = false,
         end
     end
 }):AddColorPicker('ItemsColorPicker', { Default = ItemsColor, Title = 'Items Color', Transparency = 0,
-    Callback = function(v)
-        ItemsColor = v
-        for obj in pairs(ItemsESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end
-    end
+    Callback = function(v) ItemsColor = v; for obj in pairs(ItemsESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end end
 })
 
--- ⭐ GOLD ESP
+-- GOLD ESP
 local GoldColor = Color3.fromRGB(255, 255, 0)
 local GoldESPObjects = {}
 ESP_Tab:AddToggle('GoldESP', { Text = "Gold", Default = false,
@@ -1917,13 +1940,10 @@ ESP_Tab:AddToggle('GoldESP', { Text = "Gold", Default = false,
         end
     end
 }):AddColorPicker('GoldColorPicker', { Default = GoldColor, Title = 'Gold Color', Transparency = 0,
-    Callback = function(v)
-        GoldColor = v
-        for obj in pairs(GoldESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end
-    end
+    Callback = function(v) GoldColor = v; for obj in pairs(GoldESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end end
 })
 
--- ⭐ PLAYER ESP
+-- PLAYER ESP
 local PlayersColor = Color3.fromRGB(255, 255, 255)
 local PlayerESPObjects = {}
 ESP_Tab:AddToggle('Players', { Text = "Players", Default = false,
@@ -1941,10 +1961,7 @@ ESP_Tab:AddToggle('Players', { Text = "Players", Default = false,
         end
     end
 }):AddColorPicker('PlayersColor', { Default = PlayersColor, Title = 'Players Color', Transparency = 0,
-    Callback = function(v)
-        PlayersColor = v
-        for c in pairs(PlayerESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(c, v) end
-    end
+    Callback = function(v) PlayersColor = v; for c in pairs(PlayerESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(c, v) end end
 })
 table.insert(Connections, Players.PlayerAdded:Connect(function(plr)
     if plr == LocalPlayer then return end
@@ -1956,7 +1973,7 @@ table.insert(Connections, Players.PlayerAdded:Connect(function(plr)
     end)
 end))
 
--- ⭐ STARDUST ESP
+-- STARDUST ESP
 local StardustColor = Color3.fromRGB(255, 128, 204)
 local StardustESPObjects = {}
 ESP_Tab:AddToggle('Stardust', { Text = "Stardust", Default = false,
@@ -1979,13 +1996,10 @@ ESP_Tab:AddToggle('Stardust', { Text = "Stardust", Default = false,
         end
     end
 }):AddColorPicker('StardustColor', { Default = StardustColor, Title = 'Stardust Color', Transparency = 0,
-    Callback = function(v)
-        StardustColor = v
-        for obj in pairs(StardustESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end
-    end
+    Callback = function(v) StardustColor = v; for obj in pairs(StardustESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end end
 })
 
--- ⭐ ENTITY ESP (Abysall-style)
+-- ENTITY ESP
 local EntityColor = Color3.fromRGB(255, 0, 0)
 local EntityESPObjects = {}
 local EntityAlias = {
@@ -2005,7 +2019,7 @@ ESP_Tab:AddToggle('EntityESPToggleMain', { Text = "Entities", Default = false,
         if v then
             for _, ent in ipairs(workspace:GetChildren()) do
                 local lbl = EntityAlias[ent.Name]
-                if lbl and (not Options.EntityESPOptions.Value or next(Options.EntityESPOptions.Value) == nil or Options.EntityESPOptions.Value[lbl]) then
+                if lbl then
                     Abysall.ESPLibrary:AddESP({ Object = ent, Text = lbl, Color = EntityColor })
                     EntityESPObjects[ent] = true
                 end
@@ -2016,10 +2030,7 @@ ESP_Tab:AddToggle('EntityESPToggleMain', { Text = "Entities", Default = false,
         end
     end
 }):AddColorPicker('EntityESPColor', { Default = EntityColor, Title = 'Entity Color', Transparency = 0,
-    Callback = function(v)
-        EntityColor = v
-        for obj in pairs(EntityESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end
-    end
+    Callback = function(v) EntityColor = v; for obj in pairs(EntityESPObjects) do Abysall.ESPLibrary:UpdateObjectColor(obj, v) end end
 })
 table.insert(Connections, workspace.ChildAdded:Connect(function(v)
     if not Toggles.EntityESPToggleMain.Value then return end
@@ -2031,19 +2042,15 @@ table.insert(Connections, workspace.ChildAdded:Connect(function(v)
     end
 end))
 table.insert(Connections, workspace.ChildRemoved:Connect(function(v)
-    if EntityESPObjects[v] then
-        Abysall.ESPLibrary:RemoveESP(v)
-        EntityESPObjects[v] = nil
-    end
+    if EntityESPObjects[v] then Abysall.ESPLibrary:RemoveESP(v); EntityESPObjects[v] = nil end
 end))
 
--- ⭐ ESP AUTO-RESCAN (fixes missing ESP)
+-- AUTO-RESCAN
 task.spawn(function()
     while task.wait(1.5) do
         if Library.Unloaded then break end
         local cr = LocalPlayer:GetAttribute("CurrentRoom")
         if not cr then continue end
-
         if Toggles.Door.Value then
             for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
                 local rn = tonumber(room.Name)
@@ -2055,7 +2062,6 @@ task.spawn(function()
                 end
             end
         end
-
         if Toggles.HidingSpotESP.Value then
             for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
                 local rn = tonumber(room.Name)
@@ -2073,7 +2079,6 @@ task.spawn(function()
                 end
             end
         end
-
         if Toggles.Chest.Value then
             for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
                 local rn = tonumber(room.Name)
@@ -2091,7 +2096,6 @@ task.spawn(function()
                 end
             end
         end
-
         if Toggles.Items.Value then
             for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
                 local rn = tonumber(room.Name)
@@ -2110,7 +2114,7 @@ task.spawn(function()
 end)
 LogOk("ESP done")
 
--- ═══════════ NOTIFICATIONS (ABYSALL STYLE) ═══════════
+-- ═══════════ NOTIFICATIONS ═══════════
 Log("Notifications...")
 
 local EntitiesData = {
@@ -2167,6 +2171,96 @@ table.sort(NotifyItemList)
 NotifyBox:AddDropdown("NotifyItemList", { Text = "Items to Notify", Values = NotifyItemList, Multi = true, AllowNull = true, Default = {} })
 NotifyBox:AddToggle('NotifyItemsToggle', { Text = "Notify Items", Default = false })
 NotifyBox:AddToggle('NotifyItemsShowDistance', { Text = "Show Distance", Default = false })
+NotifyBox:AddDivider()
+
+-- ⭐ HIDING TIMER (fixed — Abysall style)
+local hidingTimeConnection = nil
+local hideMonsterHook = nil
+local hidingAttributeConnection = nil
+local hidingNotification = nil
+local hidingStartTime = nil
+local currentHideDuration = nil
+
+local function ClearHidingNotification()
+    if hidingNotification then
+        pcall(function() hidingNotification:Destroy() end)
+        hidingNotification = nil
+    end
+    hidingStartTime = nil
+    currentHideDuration = nil
+end
+
+NotifyBox:AddToggle('HidingTimeNotify', {
+    Text = "Notify Hide Time",
+    Default = false,
+    Tooltip = "Shows a live timer for how long you've been hiding.",
+    Callback = function(Value)
+        if Value then
+            local char = LocalPlayer.Character
+            if not char then return end
+            if not hideMonsterHook then
+                local hideMonsterEvent = RemoteFolder:FindFirstChild("HideMonster")
+                if hideMonsterEvent then
+                    hideMonsterHook = hideMonsterEvent.OnClientEvent:Connect(function(hideDuration)
+                        if not Toggles.HidingTimeNotify.Value then return end
+                        hidingStartTime = tick()
+                        currentHideDuration = hideDuration
+                        if hidingNotification then pcall(function() hidingNotification:Destroy() end) end
+                        hidingNotification = Library:Notify({
+                            Title = "Hiding...",
+                            Description = "Time remaining: " .. tostring(hideDuration) .. "s",
+                            Time = hideDuration + 1,
+                        })
+                    end)
+                end
+            end
+            if not hidingTimeConnection then
+                hidingTimeConnection = RunService.Heartbeat:Connect(function()
+                    if not Toggles.HidingTimeNotify.Value then return end
+                    local ch = LocalPlayer.Character
+                    local isHiding = ch and ch:GetAttribute("Hiding") == true
+                    if isHiding and hidingStartTime and currentHideDuration then
+                        local elapsed = tick() - hidingStartTime
+                        local remaining = math.max(0, currentHideDuration - elapsed)
+                        if hidingNotification then
+                            pcall(function()
+                                hidingNotification:ChangeTitle("Hiding...")
+                                hidingNotification:ChangeDescription("Time remaining: " .. string.format("%.1f", remaining) .. "s")
+                            end)
+                        end
+                        if remaining <= 0 then ClearHidingNotification() end
+                    elseif not isHiding then
+                        ClearHidingNotification()
+                    end
+                end)
+            end
+            if not hidingAttributeConnection then
+                hidingAttributeConnection = char:GetAttributeChangedSignal("Hiding"):Connect(function()
+                    if not Toggles.HidingTimeNotify.Value then return end
+                    local isHiding = char:GetAttribute("Hiding")
+                    if not isHiding then ClearHidingNotification() end
+                end)
+            end
+        else
+            if hidingTimeConnection then hidingTimeConnection:Disconnect(); hidingTimeConnection = nil end
+            if hideMonsterHook then hideMonsterHook:Disconnect(); hideMonsterHook = nil end
+            if hidingAttributeConnection then hidingAttributeConnection:Disconnect(); hidingAttributeConnection = nil end
+            ClearHidingNotification()
+        end
+    end
+})
+-- Rebind hiding attribute on character respawn
+table.insert(Connections, LocalPlayer.CharacterAdded:Connect(function(newChar)
+    if Toggles.HidingTimeNotify and Toggles.HidingTimeNotify.Value then
+        if hidingAttributeConnection then hidingAttributeConnection:Disconnect() end
+        hidingAttributeConnection = newChar:GetAttributeChangedSignal("Hiding"):Connect(function()
+            if not Toggles.HidingTimeNotify.Value then return end
+            local isHiding = newChar:GetAttribute("Hiding")
+            if not isHiding then ClearHidingNotification() end
+        end)
+    end
+end))
+
 NotifyBox:AddDivider()
 
 NySet:AddToggle('EntityChatToggle', { Text = "Notify Chat", Default = false })
@@ -2238,7 +2332,7 @@ Ambient:AddToggle('AntiFog', { Text = "No Fog", Default = false,
                 local s = Lighting:FindFirstChildOfClass("Sky")
                 if s then s:Destroy() end
             end)
-        elseif skyRemovalConnection then skyRemovalConnection:Disconnect() skyRemovalConnection = nil end
+        elseif skyRemovalConnection then skyRemovalConnection:Disconnect(); skyRemovalConnection = nil end
     end
 })
 Ambient:AddToggle('AntiLag', { Text = "Anti Lag", Default = false })
@@ -2249,7 +2343,7 @@ Ambient:AddToggle('RemoveAmbience', { Text = 'No Random Ambience', Default = fal
                 if child:IsA('Attachment') then child:Destroy() end
             end)
         else
-            if Connections.RemoveAmbience then Connections.RemoveAmbience:Disconnect() Connections.RemoveAmbience = nil end
+            if Connections.RemoveAmbience then Connections.RemoveAmbience:Disconnect(); Connections.RemoveAmbience = nil end
         end
     end
 })
@@ -2283,19 +2377,15 @@ Self:AddToggle('ThirdPerson', { Text = "Third Person", Default = false,
         end
     end
 }):AddKeyPicker('ThirdPKeybind', { Default='T', SyncToggleState=true, Mode='Toggle', Text='Third Person' })
-Self:AddSlider("X", { Text = "X", Default = X, Min = -10, Max = 10, Rounding = 0, Compact = true, Callback = function(v) X = v ThirdPersonHandler.offset = Vector3.new(X,Y,Z) end })
-Self:AddSlider("Y", { Text = "Y", Default = Y, Min = -10, Max = 10, Rounding = 0, Compact = true, Callback = function(v) Y = v ThirdPersonHandler.offset = Vector3.new(X,Y,Z) end })
-Self:AddSlider("Z", { Text = "Z", Default = Z, Min = -10, Max = 10, Rounding = 0, Compact = true, Callback = function(v) Z = v ThirdPersonHandler.offset = Vector3.new(X,Y,Z) end })
+Self:AddSlider("X", { Text = "X", Default = X, Min = -10, Max = 10, Rounding = 0, Compact = true, Callback = function(v) X = v; ThirdPersonHandler.offset = Vector3.new(X,Y,Z) end })
+Self:AddSlider("Y", { Text = "Y", Default = Y, Min = -10, Max = 10, Rounding = 0, Compact = true, Callback = function(v) Y = v; ThirdPersonHandler.offset = Vector3.new(X,Y,Z) end })
+Self:AddSlider("Z", { Text = "Z", Default = Z, Min = -10, Max = 10, Rounding = 0, Compact = true, Callback = function(v) Z = v; ThirdPersonHandler.offset = Vector3.new(X,Y,Z) end })
 Self:AddDivider()
 
--- ⭐ FOV (RESTORED — now actually works)
 local CurrentFOV = 70
-Self:AddSlider("FieldofViewAdjust", {
-    Text = "FOV", Default = 70, Min = 70, Max = 120, Rounding = 1, Compact = false,
-    Callback = function(v) CurrentFOV = v end
-})
-Self:AddToggle('Fieldofview', {
-    Text = "FOV Enabled", Default = false,
+Self:AddSlider("FieldofViewAdjust", { Text = "FOV", Default = 70, Min = 70, Max = 120, Rounding = 1, Compact = false,
+    Callback = function(v) CurrentFOV = v end })
+Self:AddToggle('Fieldofview', { Text = "FOV Enabled", Default = false,
     Callback = function(v)
         if not v then
             pcall(function()
@@ -2360,8 +2450,7 @@ Effect:AddToggle('NoWardrobeVignette', { Text = 'No Wardrobe Vignette', Default 
         end)
     end
 })
-Effect:AddToggle('ReplaceGLwG', { Text = 'Replace GL With Glitch', Default = false,
-    Disabled = not firesignal,
+Effect:AddToggle('ReplaceGLwG', { Text = 'Replace GL With Glitch', Default = false, Disabled = not firesignal,
     Callback = function(value)
         if value and deathhint then
             local can = true
@@ -2415,8 +2504,7 @@ local function applyEchoSetting(enabled)
         SoundService.AmbientReverb = enabled and Enum.ReverbType.Room or Enum.ReverbType.Cave
     end
 end
-FloorsMines:AddToggle('DisableMinesEcho', { Text = "Disable Mines Echo", Default = false,
-    Callback = function(v) applyEchoSetting(v) end })
+FloorsMines:AddToggle('DisableMinesEcho', { Text = "Disable Mines Echo", Default = false, Callback = function(v) applyEchoSetting(v) end })
 FloorValueRef.Changed:Connect(function()
     applyEchoSetting(Toggles.DisableMinesEcho and Toggles.DisableMinesEcho.Value or false)
 end)
@@ -2480,7 +2568,6 @@ do
             if autoAnchorConnection then autoAnchorConnection:Disconnect(); autoAnchorConnection = nil end
         end
     end)
-
     local Minecart = { NearestTurnNode=nil, Ducked=false, LastDuck=0 }
     local function GetMinecart() local cam = workspace.CurrentCamera return cam and cam:FindFirstChild("MinecartRig") ~= nil end
     local function GetNearestTurnNode()
@@ -2539,7 +2626,6 @@ do
             return Original(...)
         end
     end)
-
     Toggles.AnticheatBypass:OnChanged(function(v)
         if not v then RemoteFolder.ClimbLadder:FireServer() end
         if v then Library:Notify("Climb a ladder to bypass", 9) end
@@ -2980,8 +3066,8 @@ function Unload()
         "RemoveDRONESTAMPEDE","Door","HidingSpotESP","Chest","Items","GoldESP","Players",
         "TaskESP","Stardust","EntityESPToggleMain","NotifyEntitiesToggle","NotifyItemsToggle",
         "EntityChatToggle","InfiniteItems","InfiniteSItems","InfiniteCrucifix","AntiScreech",
-        "Fieldofview","FieldofViewAdjust","RainbowESP","ESPShowDistance","GlobalTracerEnabled",
-        "GlobalArrowsEnabled","GlobalTextSize","GlobalOutlineTransparency","GlobalFillTransparency"
+        "Fieldofview","RainbowESP","ESPShowDistance","GlobalTracerEnabled",
+        "GlobalArrowsEnabled","FigureGodmode","HidingTimeNotify","SpeedBypass"
     }) do
         if Toggles[name] then pcall(function() Toggles[name]:SetValue(false) end) end
     end
