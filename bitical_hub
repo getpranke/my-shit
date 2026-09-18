@@ -1,6 +1,143 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  BITICAL HUB + Abysall + Tplays + Cheesy Addons (FIXED + OPTIMIZED)
+--  BITICAL HUB + Abysall + Tplays + Cheesy Addons (FIXED + DEBUG CONSOLE)
 -- ═══════════════════════════════════════════════════════════════════════════
+
+-- ═══════════ SECTION 0: DEBUG CONSOLE (mobile-friendly) ═══════════
+local DebugWindow = (function()
+    local CoreGui = game:GetService("CoreGui")
+    local Players = game:GetService("Players")
+    local UIS = game:GetService("UserInputService")
+
+    local parent
+    local ok = pcall(function() parent = CoreGui end)
+    if not ok or not parent then
+        parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+    end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "BiticalDebug_" .. tostring(math.random(1, 1e9))
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Parent = parent
+
+    local frame = Instance.new("Frame")
+    frame.Name = "DebugFrame"
+    frame.Size = UDim2.new(0, 340, 0, 220)
+    frame.Position = UDim2.new(0, 10, 0, 10)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = gui
+
+    local corner = Instance.new("UICorner", frame)
+    corner.CornerRadius = UDim.new(0, 8)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -30, 0, 24)
+    title.BackgroundTransparency = 1
+    title.Text = "  Bitical Debug (drag title)"
+    title.TextColor3 = Color3.fromRGB(73, 230, 133)
+    title.TextSize = 13
+    title.Font = Enum.Font.GothamBold
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = frame
+
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 26, 0, 22)
+    closeBtn.Position = UDim2.new(1, -28, 0, 1)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(60, 30, 30)
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+    closeBtn.TextSize = 12
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Parent = frame
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+
+    local clearBtn = Instance.new("TextButton")
+    clearBtn.Size = UDim2.new(0, 40, 0, 22)
+    clearBtn.Position = UDim2.new(1, -72, 0, 1)
+    clearBtn.BackgroundColor3 = Color3.fromRGB(40, 50, 60)
+    clearBtn.Text = "CLR"
+    clearBtn.TextColor3 = Color3.fromRGB(180, 200, 220)
+    clearBtn.TextSize = 11
+    clearBtn.Font = Enum.Font.GothamBold
+    clearBtn.Parent = frame
+    Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 4)
+
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, -6, 1, -30)
+    scroll.Position = UDim2.new(0, 3, 0, 27)
+    scroll.BackgroundTransparency = 1
+    scroll.ScrollBarThickness = 4
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.Parent = frame
+
+    local layout = Instance.new("UIListLayout")
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 2)
+    layout.Parent = scroll
+
+    local hideBtn = Instance.new("TextButton")
+    hideBtn.Size = UDim2.new(0, 40, 0, 20)
+    hideBtn.Position = UDim2.new(0, 10, 0, -22)
+    hideBtn.BackgroundColor3 = Color3.fromRGB(40, 60, 40)
+    hideBtn.Text = "SHOW"
+    hideBtn.TextColor3 = Color3.fromRGB(73, 230, 133)
+    hideBtn.TextSize = 11
+    hideBtn.Font = Enum.Font.GothamBold
+    hideBtn.Parent = gui
+    Instance.new("UICorner", hideBtn).CornerRadius = UDim.new(0, 4)
+
+    local visible = true
+    hideBtn.MouseButton1Click:Connect(function()
+        visible = not visible
+        frame.Visible = visible
+        hideBtn.Text = visible and "SHOW" or "SHOW"
+        hideBtn.Position = visible and UDim2.new(0, 10, 0, -22) or UDim2.new(0, 10, 0, 10)
+    end)
+
+    closeBtn.MouseButton1Click:Connect(function()
+        gui.Enabled = false
+    end)
+
+    local function addEntry(text, color)
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, -6, 0, 0)
+        label.AutomaticSize = Enum.AutomaticSize.Y
+        label.BackgroundTransparency = 1
+        label.Text = "[" .. os.date("%H:%M:%S") .. "] " .. tostring(text)
+        label.TextColor3 = color
+        label.TextSize = 11
+        label.Font = Enum.Font.Code
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.TextWrapped = true
+        label.Parent = scroll
+    end
+
+    clearBtn.MouseButton1Click:Connect(function()
+        for _, c in ipairs(scroll:GetChildren()) do
+            if c:IsA("TextLabel") then c:Destroy() end
+        end
+    end)
+
+    return {
+        Log = function(t) addEntry(t, Color3.fromRGB(200, 200, 200)) end,
+        Ok = function(t) addEntry(t, Color3.fromRGB(73, 230, 133)) end,
+        Warn = function(t) addEntry(t, Color3.fromRGB(255, 200, 60)) end,
+        Error = function(t) addEntry(t, Color3.fromRGB(255, 80, 80)) end,
+        Gui = gui,
+        Frame = frame,
+    }
+end)()
+
+function LogOk(msg) DebugWindow.Ok(msg) print("[Bitical] " .. tostring(msg)) end
+function LogWarn(msg) DebugWindow.Warn(msg) warn("[Bitical] " .. tostring(msg)) end
+function LogErr(msg) DebugWindow.Error(msg) warn("[Bitical] " .. tostring(msg)) end
+function Log(msg) DebugWindow.Log(msg) print("[Bitical] " .. tostring(msg)) end
+
+LogOk("=== BITICAL LOADING ===")
 
 -- ═══════════ SECTION 1: SERVICES ═══════════
 local Players           = game:GetService("Players")
@@ -12,30 +149,39 @@ local SoundService      = game:GetService("SoundService")
 local Lighting          = game:GetService("Lighting")
 local Debris            = game:GetService("Debris")
 local Workspace         = workspace
+LogOk("Step 1: Services loaded")
 
 local LocalPlayer = Players.LocalPlayer
-if LocalPlayer:GetAttribute("SapphireLoaded") then print("[Dup] Already loaded"); return end
+if LocalPlayer:GetAttribute("SapphireLoaded") then
+    LogWarn("Already loaded — aborting")
+    return
+end
 LocalPlayer:SetAttribute("SapphireLoaded", true)
 
 -- ═══════════ SECTION 2: GAME REFS ═══════════
-Floor = ReplicatedStorage:WaitForChild("GameData"):WaitForChild("Floor")
-RemoteFolder = ReplicatedStorage:WaitForChild("RemotesFolder", 30)
-if not RemoteFolder then warn("RemotesFolder not found"); return end
-
-MainGame = LocalPlayer.PlayerGui:WaitForChild("MainUI", 30):WaitForChild("Initiator", 30):WaitForChild("Main_Game", 30)
-RequiredMainGame = require(MainGame)
-RemoteListener = MainGame.RemoteListener
-Modules = RemoteListener.Modules
-ClientModules = ReplicatedStorage:FindFirstChild("ModulesClient") or ReplicatedStorage:FindFirstChild("ClientModules")
-Modifiers = ReplicatedStorage:WaitForChild("LiveModifiers", 30)
-CurrentRooms = Workspace:WaitForChild("CurrentRooms", 30)
-LatestRoom = ReplicatedStorage.GameData.LatestRoom
+local ok1, err1 = pcall(function()
+    Floor = ReplicatedStorage:WaitForChild("GameData"):WaitForChild("Floor")
+    RemoteFolder = ReplicatedStorage:WaitForChild("RemotesFolder", 30)
+    if not RemoteFolder then error("RemotesFolder missing") end
+    MainGame = LocalPlayer.PlayerGui:WaitForChild("MainUI", 30):WaitForChild("Initiator", 30):WaitForChild("Main_Game", 30)
+    RequiredMainGame = require(MainGame)
+    RemoteListener = MainGame.RemoteListener
+    Modules = RemoteListener.Modules
+    ClientModules = ReplicatedStorage:FindFirstChild("ModulesClient") or ReplicatedStorage:FindFirstChild("ClientModules")
+    Modifiers = ReplicatedStorage:WaitForChild("LiveModifiers", 30)
+    CurrentRooms = Workspace:WaitForChild("CurrentRooms", 30)
+    LatestRoom = ReplicatedStorage.GameData.LatestRoom
+end)
+if not ok1 then
+    LogErr("Step 2 FAILED: " .. tostring(err1))
+    return
+end
+LogOk("Step 2: Refs loaded")
 
 local Crouch = RemoteFolder:WaitForChild("Crouch", 10)
 local ChangeModuleVariable = RemoteFolder:FindFirstChild("ChangeModuleVariable")
 local FireToolProjectile = RemoteFolder:FindFirstChild("FireToolProjectile")
 local deathhint = RemoteFolder:FindFirstChild("DeathHint")
-local SeatControl = RemoteFolder:FindFirstChild("SeatControl")
 
 -- ═══════════ SECTION 3: CHARACTER ═══════════
 Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -54,33 +200,28 @@ function Sound()
 end
 Sound()
 
--- ═══════════ SECTION 3B: ANTI CHAIR SIT (SAFE — only blocks SeatControl) ═══════════
-do
-    if hookmetamethod and newcclosure and getnamecallmethod then
-        local origNamecall
-        local hookOk = pcall(function()
-            origNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-                local m = getnamecallmethod()
-                -- SAFETY: only check .Name if self is an Instance (not a table/string)
-                if m == "FireServer" and typeof(self) == "Instance" and self.Name == "SeatControl" then
-                    return -- block sitting silently
-                end
-                return origNamecall(self, ...)
-            end))
-        end)
-        if not hookOk then
-            warn("[Bitical] Anti-Sit hook failed, falling back to remote destroy")
-        end
+pcall(function()
+    if Character.Collision:FindFirstChild("CollisionCrouch") then
+        Character.Collision.CollisionCrouch.Size = Vector3.new(0.5, 0.001, 3)
     end
-    -- Fallback: destroy SeatControl remote if it reappears
-    task.spawn(function()
-        while task.wait(2) do
-            if LocalPlayer:GetAttribute("SapphireLoaded") == nil then break end
-            local sc = RemoteFolder and RemoteFolder:FindFirstChild("SeatControl")
-            if sc then pcall(function() sc:Destroy() end) end
-        end
-    end)
-end
+end)
+
+CollisionClone = Character.CollisionPart:Clone()
+CollisionClone.Parent = Character
+CollisionClone.Massless = true
+CollisionClone.CanCollide = false
+CollisionClone.Name = "_CollisionPart"
+if CollisionClone:FindFirstChild("CollisionCrouch") then CollisionClone.CollisionCrouch:Destroy() end
+
+CollisionClone2 = Character.CollisionPart:Clone()
+CollisionClone2.Parent = Character
+CollisionClone2.Massless = true
+CollisionClone2.CanCollide = false
+CollisionClone2.Name = "_CollisionPart2"
+if CollisionClone2:FindFirstChild("CollisionCrouch") then CollisionClone2.CollisionCrouch:Destroy() end
+LogOk("Step 3: Character set up")
+
+-- NOTE: Anti Chair Sit REMOVED to test freeze
 
 -- ═══════════ SECTION 4: ACHIEVEMENTS ═══════════
 Achievement = (function()
@@ -121,6 +262,7 @@ Achievement = (function()
 end)()
 
 -- ═══════════ SECTION 5: LIBRARY ═══════════
+Log("Step 5a: Loading UI library...")
 Pathnode = Instance.new("Folder", Workspace)
 Pathnode.Name = "Path Node"
 
@@ -135,30 +277,48 @@ Executor = executorSuccess and executorResult or "Unknown"
 
 local libSuccess, libResult = pcall(function() return loadstring(game:HttpGet(repo..'Library.lua'))() end)
 if libSuccess then Library = libResult
-else warn("Failed to load UI library"); return end
+else LogErr("Step 5 FAILED: UI library"); return end
+LogOk("Step 5b: Library loaded")
 
-ThemeManager = loadstring(game:HttpGet(repo..'addons/ThemeManager.lua'))()
-SaveManager  = loadstring(game:HttpGet(repo..'addons/SaveManager.lua'))()
+Log("Step 5c: Loading addons...")
+local ok2, err2 = pcall(function()
+    ThemeManager = loadstring(game:HttpGet(repo..'addons/ThemeManager.lua'))()
+    SaveManager  = loadstring(game:HttpGet(repo..'addons/SaveManager.lua'))()
+end)
+if not ok2 then LogErr("SaveManager/Theme failed: " .. tostring(err2)) end
+
 Options      = Library.Options
 Toggles      = Library.Toggles
-ESPLibrary   = loadstring(game:HttpGet("https://raw.githubusercontent.com/mstudio45/MSESP/refs/heads/main/source.luau"))()
-ESPLibrary.GlobalConfig.Tracers = false
-ESPLibrary.GlobalConfig.Arrows = false
+
+Log("Step 5d: Loading ESP library...")
+local ok3, err3 = pcall(function()
+    ESPLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/mstudio45/MSESP/refs/heads/main/source.luau"))()
+end)
+if not ok3 then
+    LogErr("ESP library FAILED: " .. tostring(err3))
+    ESPLibrary = { GlobalConfig = {}, Add = function() return { Show = function() end, Hide = function() end, Destroy = function() end } end, RemoveESP = function() end, ColorTable = {} }
+end
+if ESPLibrary and ESPLibrary.GlobalConfig then
+    ESPLibrary.GlobalConfig.Tracers = false
+    ESPLibrary.GlobalConfig.Arrows = false
+end
+LogOk("Step 5e: All libraries loaded")
 
 if Checkbox == nil then Library.ForceCheckbox = true else Library.ForceCheckbox = Checkbox end
 Library.NotifySide = "Right"
 Connections = {}
 addonLoaded = true
 
-Library:Notify("Loading Sapphire | Doors", 5)
-
+Log("Step 5f: Creating window...")
 Window = Library:CreateWindow({
     Title = '👾Bitical Hub👾',
     Footer = "LEAKED BY YUANTAI15041(3657198102)",
     Center = true, NotifySide = "Right", AutoShow = true
 })
+LogOk("Step 5g: Window created")
 
 -- ═══════════ SECTION 6: TABS ═══════════
+Log("Step 6: Creating tabs...")
 if UIStyle == "LinoriaLib" then
     Tabs = {
         Homepage    = Window:AddTab("Home"),
@@ -182,8 +342,10 @@ else
         Addons      = Window:AddTab({ Name = "Addons",   Description = "Community Addons",              Icon = "boxes" })
     }
 end
+LogOk("Step 6: Tabs created")
 
 -- ═══════════ SECTION 7: GROUPBOXES ═══════════
+Log("Step 7: Creating groupboxes...")
 User = Tabs.Homepage:AddLeftGroupbox("User Info", "user-round")
 Info = Tabs.Homepage:AddRightGroupbox("Info", "info")
 
@@ -227,10 +389,11 @@ FloorsModifiers = Tabs.Floor:AddRightGroupbox('Modifiers')
 FloorsFarm      = Tabs.Floor:AddRightGroupbox("Farming")
 
 SettingsBox = Tabs.UISettings:AddLeftGroupbox('UI', 'wrench')
+LogOk("Step 7: Groupboxes created")
 
 Tabs.Homepage:UpdateWarningBox({
     Title = "Changelog:",
-    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Anti Sit SAFE hook\nAuto-Interact chair skip\nESP Auto-Rescan\nSpeedBypass restored\nFixed freeze on load</font>",
+    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Anti Sit REMOVED (debug)\nUnified __namecall hook\nESP Auto-Rescan\nSpeedBypass restored\n+ Debug Console</font>",
     IsNormal = true, Visible = true, LockSize = true,
 })
 
@@ -306,15 +469,10 @@ Info:AddLabel("[<font color=\"rgb(73,230,133)\">????</font>] LEAKER")
 Info:AddDivider()
 Info:AddButton({
     Text = "Show Current Floor", DoubleClick = false,
-    Tooltip = "Displays the current floor name.",
     Func = function()
         local floorName = (Floor and Floor.Value) or "Unknown"
-        Library:Notify({
-            Title = "Current Floor",
-            Description = "You are currently on: <font color=\"rgb(73,230,133)\">" .. tostring(floorName) .. "</font>",
-            Time = 5
-        })
-        print("[Bitical] Current Floor: " .. tostring(floorName))
+        Library:Notify({ Title = "Current Floor", Description = "You are on: " .. tostring(floorName), Time = 5 })
+        LogOk("Current Floor: " .. tostring(floorName))
         Sound()
     end,
 })
@@ -324,6 +482,17 @@ if Floor and Floor:IsA("StringValue") then
         pcall(function() floorNameLabel:SetText("Current Floor: " .. tostring(Floor.Value)) end)
     end))
 end
+Info:AddDivider()
+Info:AddButton({
+    Text = "Test Debug Console", DoubleClick = false,
+    Func = function()
+        LogOk("Test OK message")
+        LogWarn("Test warning message")
+        LogErr("Test error message")
+    end,
+})
+
+LogOk("Step 9: Home page done")
 
 -- ═══════════ SECTION 10: MOVEMENT ═══════════
 Speed = 15
@@ -367,7 +536,7 @@ Toggles.EnableJump:OnChanged(function(Value)
     if Character then Character:SetAttribute("CanJump", Value) end
 end)
 
-Movement:AddToggle('EnableSlide', { Text = "Enable Sliding", Default = false, Tooltip = "Allows your character to slide." })
+Movement:AddToggle('EnableSlide', { Text = "Enable Sliding", Default = false })
 Toggles.EnableSlide:OnChanged(function(Value)
     if Character then Character:SetAttribute("CanSlide", Value) end
 end)
@@ -463,7 +632,6 @@ end)
 local Phantom_Enabled, Phantom_LastSafeCFrame = false, nil
 local Phantom_NoclipConnection, Phantom_AntiTpConnection = nil, nil
 local Phantom_Tolerance = 3
-
 local function Phantom_GetRoot() local c = LocalPlayer.Character return c and c:FindFirstChild("HumanoidRootPart") end
 local function Phantom_SetNoclip(state)
     local c = LocalPlayer.Character; if not c then return end
@@ -517,7 +685,6 @@ Movement:AddDivider()
 Fly = Fly or {}
 Fly.Enabled = false; Fly.Speed = 15
 local renderConn; charAddedConn = nil
-
 function Fly.SetupBodies(char)
     root = char:FindFirstChild("HumanoidRootPart"); if not root then return end
     bv = Instance.new("BodyVelocity"); bv.Name = "FlyBodyVelocity"
@@ -594,6 +761,7 @@ FlySpeed = Movement:AddSlider("FlySpeed", {
     Text = "Fly Speed", Min = 10, Max = 21, Default = Fly.Speed, Rounding = 0,
     Callback = function(v) Fly.SetSpeed(v) end
 })
+LogOk("Step 10: Movement done")
 
 -- ═══════════ SECTION 11: AUTOMATION ═══════════
 local Ignore = {
@@ -622,34 +790,25 @@ Automation:AddToggle('AutoInteract', {
     Default = 'R', SyncToggleState = true, Mode = 'Toggle', Text = 'Auto Interact', NoUI = false,
     Callback = function(Value) end, ChangedCallback = function(New) end
 })
-
 Automation:AddDropdown("IgnoreList", {
     Values = {"Jeff Items", "Coins", "Candy", "Dropped Items", "Glitch Cube", "Death Candy"},
     Default = 1, Multi = true, Text = "Ignore List", Callback = function(Value) end,
 })
 Automation:AddDivider()
 
-Automation:AddToggle('AutoHeartbeatMiniGame', { Text = "Auto Heartbeat Mini Game", Default = false })
-pcall(function()
-    local oldHB = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-        local args = { ... }
-        if self.Name == "ClutchHeartbeat" and getnamecallmethod() == "FireServer" and
-            Toggles.AutoHeartbeatMiniGame and Toggles.AutoHeartbeatMiniGame.Value then
-            args[1] = true
-            return oldHB(self, unpack(args))
-        end
-        return oldHB(self, ...)
-    end))
-end)
+Automation:AddToggle('AutoHeartbeatMiniGame', {
+    Text = "Auto Heartbeat Mini Game", Default = false,
+    Disabled = not hookmetamethod,
+    DisabledTooltip = "Executor doesn't support hookmetamethod",
+})
 
 local PL = nil; local UnlockDistance = 40
 Automation:AddToggle('AutoCodeFire', {
     Text = "Auto Unlock Padlock", Default = false,
-    Tooltip = "Automatically unlocks padlocks within range",
     Callback = function(on)
         if on then
             PL = ReplicatedStorage.RemotesFolder:FindFirstChild("PL")
-            if not PL then Library:Notify("Padlock remote not found", 3); Toggles.AutoCodeFire:SetValue(false); return end
+            if not PL then LogWarn("Padlock remote missing"); Toggles.AutoCodeFire:SetValue(false); return end
             while ReplicatedStorage.GameData.LatestRoom.Value < 50 do
                 task.wait(0.4)
                 if not Toggles.AutoCodeFire.Value then return end
@@ -776,10 +935,7 @@ Automation:AddToggle('AutoGlitch', {
 
 Automation:AddToggle('AutoCloset', {
     Text = "Auto Closet", Default = false,
-    Tooltip = "Automatically hides in a nearby closet when an entity is near."
-}):AddKeyPicker('AutoClosetKeybind', {
-    Default = 'Q', Mode = 'Toggle', SyncToggleState = true, Text = 'Auto Closet',
-})
+}):AddKeyPicker('AutoClosetKeybind', { Default = 'Q', Mode = 'Toggle', SyncToggleState = true, Text = 'Auto Closet' })
 Automation:AddDropdown("AutoClosetEntityList", {
     Text = "Ignore List",
     Values = { "Rush", "Ambush", "Blitz", "A-60", "A-120", "AR0xMBUSH", "RNIUSHCG==" },
@@ -826,6 +982,7 @@ task.spawn(function()
         end
     end
 end)
+LogOk("Step 11: Automation done")
 
 -- ═══════════ SECTION 12: REACH ═══════════
 ReachBox:AddToggle('DoorReach', { Text = "Extended Door Reach", Default = false })
@@ -892,14 +1049,14 @@ LobbyBox:AddButton({
     end
 })
 LobbyBox:AddDivider()
-LobbyBox:AddLabel({ Text = "Quick-access lobby actions (from Abysall)", DoesWrap = true })
+LobbyBox:AddLabel({ Text = "Quick-access lobby actions", DoesWrap = true })
 
--- ═══════════ SECTION 13B: MISC ═══════════
 MiscBox:AddButton({ Text = "Reset Character", DoubleClick = true, Func = function() replicatesignal(LocalPlayer.Kill) end })
 MiscBox:AddButton({ Text = "Force Respawn", DoubleClick = true, Func = function() pcall(function() LocalPlayer.Character:BreakJoints() end) end })
 MiscBox:AddButton({ Text = "Copy Job ID", DoubleClick = false, Func = function()
     if setclipboard then setclipboard(game.JobId) Library:Notify("Copied Job ID") end
 end })
+LogOk("Step 13: Lobby + Misc done")
 
 -- ═══════════ SECTION 14: ENTITY PREVENTION ═══════════
 Anti:AddToggle('AntiDread', {
@@ -927,11 +1084,8 @@ table.insert(Connections, workspace.CurrentCamera.ChildAdded:Connect(function(v)
     if v.Name == "GlitchScreech" and Toggles.AntiScreech and Toggles.AntiScreech.Value then v:Destroy() end
 end))
 Anti:AddToggle('AntiDupe', { Text = "Anti Dupe", Default = false })
-
--- Improved Anti Eyes / Lookman
 Anti:AddToggle('AntiEyes', {
     Text = "Anti Eyes / Lookman", Default = false,
-    Tooltip = "Prevents 'Eyes' and 'Lookman' from hurting you."
 })
 table.insert(Connections, workspace.ChildAdded:Connect(function(v)
     if (v.Name == "Eyes" or v.Name == "Lookman") and Toggles.AntiEyes and Toggles.AntiEyes.Value then
@@ -950,7 +1104,6 @@ table.insert(Connections, workspace.ChildAdded:Connect(function(v)
         end)
     end
 end))
-
 Anti:AddToggle('AntiSnare', {
     Text = "Anti Snare", Default = false,
     Callback = function(Value)
@@ -962,6 +1115,7 @@ Anti:AddToggle('AntiSnare', {
         end
     end
 })
+LogOk("Step 14: Anti-entities done")
 
 -- ═══════════ SECTION 15: BYPASS ═══════════
 local nothitted = false
@@ -1029,7 +1183,6 @@ Bypass:AddToggle('SpeedBypass', {
         end
     end,
 })
-
 task.spawn(function()
     while task.wait() do
         if Library.Unloaded then break end
@@ -1052,7 +1205,6 @@ task.spawn(function()
         end
     end
 end)
-
 Bypass:AddSlider("SpeedBypassInternal", {
     Text = "Speed Bypass Interval", Default = 0.216, Min = 0.2, Max = 0.23, Rounding = 2, Compact = false,
     Callback = function(Value) SpeedBypassInterval = Value end,
@@ -1101,7 +1253,6 @@ Bypass:AddDropdown("GMDropdown", { Values = { "Auto", "Toggle" }, Default = 2, M
 
 Bypass:AddToggle('CrouchSpoof', {
     Text = "Crouch Spoof", Default = false,
-    Tooltip = "Makes the game think you are always crouching."
 })
 Toggles.CrouchSpoof:OnChanged(function(Value)
     if RemoteFolder:FindFirstChild("Crouch") then
@@ -1110,28 +1261,10 @@ Toggles.CrouchSpoof:OnChanged(function(Value)
 end)
 Bypass:AddDivider()
 
--- Tplays
+-- Tplays manipulation flags (hook set up later)
 local cogAlt, slideSH, noSpread, fastThrow = false, false, false, false
 local OGC1 = Character.LowerTorso and Character.LowerTorso.Root and Character.LowerTorso.Root.C1
-local hookNamecall
-if hookmetamethod then
-    hookNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-        local args = {...}
-        local method = getnamecallmethod()
-        if self == Crouch and method == "FireServer" then
-            if cogAlt then args[1] = true end
-            if slideSH then args[2] = true end
-        end
-        if self == FireToolProjectile and method == "Fire" then
-            if noSpread then
-                args[3] = workspace.CurrentCamera.CFrame.Position
-                args[4] = workspace.CurrentCamera.CFrame.LookVector
-            end
-            if fastThrow then args[5] = 500 end
-        end
-        return hookNamecall(self, unpack(args))
-    end))
-end
+local hookNamecall  -- will be assigned by unified hook in Section 34B
 
 Bypass:AddToggle('CollisionOffsetGodmodeAlt', {
     Text = "Position Offset Alt", Default = false,
@@ -1162,10 +1295,8 @@ Bypass:AddToggle('CollisionOffsetGodmodeAlt', {
 })
 
 Bypass:AddToggle('NoSpread', { Text = 'No Spread', Default = false,
-    Disabled = not hookNamecall, DisabledTooltip = "Executor not supported",
     Callback = function(value) noSpread = value end })
 Bypass:AddToggle('FastThrow', { Text = 'Fast Throw', Default = false,
-    Disabled = not hookNamecall, DisabledTooltip = "Executor not supported",
     Callback = function(value) fastThrow = value end })
 Bypass:AddDivider()
 
@@ -1188,8 +1319,10 @@ Bypass:AddToggle('SlideSpeedHack', {
         else
             slideSH = false
             if Connections.WalkSpeed then Connections.WalkSpeed:Disconnect() Connections.WalkSpeed = nil end
-            Character:SetAttribute("SpeedBoostBehind", 0)
-            Character.Humanoid.WalkSpeed = 15
+            if Character then
+                Character:SetAttribute("SpeedBoostBehind", 0)
+                Character.Humanoid.WalkSpeed = 15
+            end
         end
     end
 })
@@ -1410,6 +1543,7 @@ Bypass:AddToggle('InfiniteCrucifix', {
         end
     end
 })
+LogOk("Step 15: Bypass done")
 
 -- ═══════════ SECTION 16: UNIVERSAL ═══════════
 ExploitsUniversal:AddButton({
@@ -1586,6 +1720,7 @@ ExploitsUniversal:AddToggle('AntiSurge', {
         end
     end
 })
+LogOk("Step 16: Universal done")
 
 -- ═══════════ SECTION 17: TROLLING ═══════════
 Troll:AddToggle("Spamtoolz", { Text = "Abuse Others' Tools", Default = false }):AddKeyPicker("Spamtoolz_X", {
@@ -1618,9 +1753,9 @@ SettingsESP:AddDropdown("ESPType", {
     Values = { "Text", "SphereAdornment", "CylinderAdornment", "Adornment", "SelectionBox", "Highlight" },
     Default = "Highlight", Text = "ESP Type", Callback = function(Value) ESPGlobalSettings.ESPType = Value end
 })
-SettingsESP:AddToggle('GlobalTracerEnabled', { Text = "Tracers", Default = false, Callback = function(Value) ESPLibrary.GlobalConfig.Tracers = Value end })
-SettingsESP:AddToggle('GlobalArrowsEnabled', { Text = "Arrows", Default = false, Callback = function(Value) ESPLibrary.GlobalConfig.Arrows = Value end })
-SettingsESP:AddToggle('RainbowESP', { Text = 'Rainbow ESP', Default = false, Callback = function(Value) ESPLibrary.GlobalConfig.Rainbow = Value end })
+SettingsESP:AddToggle('GlobalTracerEnabled', { Text = "Tracers", Default = false, Callback = function(Value) if ESPLibrary.GlobalConfig then ESPLibrary.GlobalConfig.Tracers = Value end end })
+SettingsESP:AddToggle('GlobalArrowsEnabled', { Text = "Arrows", Default = false, Callback = function(Value) if ESPLibrary.GlobalConfig then ESPLibrary.GlobalConfig.Arrows = Value end end })
+SettingsESP:AddToggle('RainbowESP', { Text = 'Rainbow ESP', Default = false, Callback = function(Value) if ESPLibrary.GlobalConfig then ESPLibrary.GlobalConfig.Rainbow = Value end end })
 SettingsESP:AddSlider('GlobalTextSize', { Text = "Text Size", Default = 16, Min = 10, Max = 50, Rounding = 0, Compact = true, Callback = function(Value) ESPGlobalSettings.TextSize = Value end })
 SettingsESP:AddSlider('GlobalOutlineTransparency', { Text = "Outline Transparency", Default = 0.4, Min = 0, Max = 1, Rounding = 2, Compact = true, Callback = function(Value) ESPGlobalSettings.OutlineTransparency = Value end })
 SettingsESP:AddSlider('GlobalFillTransparency', { Text = "Fill Transparency", Default = 0.7, Min = 0, Max = 1, Rounding = 2, Compact = true, Callback = function(Value) ESPGlobalSettings.FillTransparency = Value end })
@@ -1631,7 +1766,6 @@ local function shouldShowESP(roomNumber)
     return roomNumber == cr or roomNumber == cr + 1
 end
 
--- Door ESP
 local DoorESPObjects = {}
 local DoorColor = Color3.new(0, 1, 1)
 local function AddDoorESP(door, roomNumber)
@@ -1713,7 +1847,6 @@ table.insert(Connections, workspace.CurrentRooms.ChildAdded:Connect(function(roo
     end
 end))
 
--- Hiding Spots ESP
 local HidingSpots = {
     Wardrobe = "Wardrobe", Rooms_Locker = "Wardrobe", Backdoor_Wardrobe = "Wardrobe",
     Toolshed = "Wardrobe", Locker_Large = "Wardrobe", Bed = "Bed", CircularVent = "Vent",
@@ -1757,7 +1890,6 @@ ESP:AddToggle('HidingSpotESP', {
     end
 }):AddColorPicker('HidingSpotColorPicker', { Default = HidingSpotColor, Title = 'Hiding Spot Color', Transparency = 0 })
 
--- Chest ESP
 local ChestColor = Color3.new(1, 0.8, 0)
 local ChestESPObjects = {}
 local function AddChestESP(model, text, color)
@@ -1813,7 +1945,7 @@ ESP:AddToggle('Stardust', { Text = "Stardust", Default = false }):AddColorPicker
 local EntityColor = Color3.new(1, 0, 0)
 ESP:AddToggle('EntitiesESP', { Text = "Entities", Default = false }):AddColorPicker('EntityColorPicker', { Default = EntityColor, Title = 'Entity Color', Transparency = 0 })
 
--- ⭐ ESP AUTO-RESCAN
+-- ESP Auto-Rescan
 task.spawn(function()
     while task.wait(1.5) do
         if Library.Unloaded then break end
@@ -1872,6 +2004,7 @@ task.spawn(function()
         end
     end
 end)
+LogOk("Step 18: ESP done")
 
 -- ═══════════ SECTION 19: NOTIFICATIONS ═══════════
 NotifyBox:AddDropdown("EntitiesPicker", {
@@ -2362,7 +2495,6 @@ FloorsRipple:AddButton({
 local DRONESTAMPEDE_Running = false
 FloorsArchives:AddToggle('RemoveDRONESTAMPEDE', {
     Text = "Remove DRONESTAMPEDE", Default = false,
-    Tooltip = "Infinitely fires the ArchivesClock's LookedAtRemote while enabled.",
     Callback = function(value)
         if value then
             if DRONESTAMPEDE_Running then return end
@@ -2437,7 +2569,6 @@ FloorsArchives:AddSlider("ArchivesLockerCooldown", {
 -- ═══════════ SECTION 30: STAIRWELL ═══════════
 local SW_StairwellEnabled, SW_CartEnabled, SW_TVStandEnabled, SW_FireAlarmEnabled = false, false, false, false
 local SW_trackedStairwell, SW_trackedCarts, SW_trackedTVStands, SW_trackedFireAlarms = {}, {}, {}, {}
-local SW_connections = {}
 local SW_STAIRWELL_FILL = Color3.fromRGB(80, 200, 255)
 local SW_CART_FILL      = Color3.fromRGB(0, 45, 160)
 local SW_TVSTAND_FILL   = Color3.fromRGB(255, 170, 0)
@@ -2574,9 +2705,7 @@ FloorsStairwell:AddDivider()
 FloorsStairwell:AddLabel({ Text = "Stairwell = Cyan\nCart = Deep Blue\nTV Stand = Orange\nFire Alarm = Red", DoesWrap = true })
 
 -- ═══════════ SECTION 31: RETRO MOD ═══════════
-FloorsRetroMod:AddToggle('AntiSeekingWall', {
-    Text = "Anti Seeking Wall", Default = false,
-})
+FloorsRetroMod:AddToggle('AntiSeekingWall', { Text = "Anti Seeking Wall", Default = false })
 Toggles.AntiSeekingWall:OnChanged(function(Value)
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj.Name == "ScaryWall" and obj:IsA("Model") then
@@ -2590,9 +2719,7 @@ Toggles.AntiSeekingWall:OnChanged(function(Value)
 end)
 
 -- ═══════════ SECTION 32: SUPER HARD MODE ═══════════
-FloorsHardMode:AddToggle('AntiJeff', {
-    Text = "Anti Jeff", Default = false,
-})
+FloorsHardMode:AddToggle('AntiJeff', { Text = "Anti Jeff", Default = false })
 Toggles.AntiJeff:OnChanged(function(Value)
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj.Name == "JeffTheKiller" and obj:IsA("Model") then
@@ -2602,9 +2729,7 @@ Toggles.AntiJeff:OnChanged(function(Value)
         end
     end
 end)
-FloorsHardMode:AddToggle('AntiBanana', {
-    Text = "Anti Banana", Default = false,
-})
+FloorsHardMode:AddToggle('AntiBanana', { Text = "Anti Banana", Default = false })
 Toggles.AntiBanana:OnChanged(function(Value)
     for _, obj in ipairs(workspace.CurrentRooms:GetDescendants()) do
         if obj.Name == "BananaPeel" or obj.Name == "NannerPeel" then
@@ -2660,8 +2785,65 @@ FloorsFarm:AddButton({
         loadstring(game:HttpGet("https://raw.msdoors.xyz/deathfarm"))()
     end
 })
+LogOk("Step 34: All UI built")
 
--- ═══════════ SECTION 35: MAIN RENDER LOOP (CONSOLIDATED) ═══════════
+-- ═══════════ SECTION 34B: UNIFIED __namecall HOOK ═══════════
+Log("Step 34B: Installing unified hook...")
+do
+    if hookmetamethod and newcclosure and getnamecallmethod then
+        local ok, err = pcall(function()
+            local original
+            original = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+                local method = getnamecallmethod()
+                local isInstance = (typeof(self) == "Instance")
+
+                if method == "FireServer" and isInstance then
+                    if self.Name == "ClutchHeartbeat"
+                       and Toggles.AutoHeartbeatMiniGame and Toggles.AutoHeartbeatMiniGame.Value then
+                        local args = {...}
+                        args[1] = true
+                        return original(self, unpack(args))
+                    end
+
+                    if self.Name == "Crouch" then
+                        if cogAlt or slideSH then
+                            local args = {...}
+                            if cogAlt then args[1] = true end
+                            if slideSH then args[2] = true end
+                            return original(self, unpack(args))
+                        end
+                    end
+                end
+
+                if method == "Fire" and isInstance and self.Name == "FireToolProjectile" then
+                    if noSpread or fastThrow then
+                        local args = {...}
+                        if noSpread then
+                            args[3] = workspace.CurrentCamera.CFrame.Position
+                            args[4] = workspace.CurrentCamera.CFrame.LookVector
+                        end
+                        if fastThrow then args[5] = 500 end
+                        return original(self, unpack(args))
+                    end
+                end
+
+                return original(self, ...)
+            end))
+            hookNamecall = original
+        end)
+        if not ok then
+            LogErr("Hook failed: " .. tostring(err))
+            hookNamecall = nil
+        else
+            LogOk("Unified hook installed")
+        end
+    else
+        LogWarn("No hookmetamethod support — some features disabled")
+    end
+end
+
+-- ═══════════ SECTION 35: MAIN RENDER LOOP ═══════════
+Log("Step 35: Starting main loop...")
 table.insert(Connections, RunService.RenderStepped:Connect(function()
     alive = LocalPlayer:GetAttribute("Alive")
     if not alive then return end
@@ -2781,7 +2963,6 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         Character.HumanoidRootPart.CanCollide = false
     end
 
-    -- Auto Interact (skips chairs)
     if Toggles.AutoInteract and Toggles.AutoInteract.Value then
         for _, prompt in ipairs(AutoInteractTable) do
             if prompt and prompt.Parent then
@@ -2861,9 +3042,11 @@ table.insert(Connections, workspace.DescendantAdded:Connect(function(v)
         end
     end
 end))
+LogOk("Step 35: Main loop started")
 
 -- ═══════════ SECTION 36: UNLOAD ═══════════
 function Unload()
+    Log("Unloading...")
     addonLoaded = false
     for _, name in ipairs({
         "EnableSlide","AutoCloset","SpectateEntity","AutoAnchorSolver","AutoSteerMinecart",
@@ -2902,6 +3085,7 @@ function Unload()
     pcall(function() RunService:UnbindFromRenderStep("GOD_MODE_CAMERA_SYS") end)
     if AnticheatManipulationLoop then pcall(function() task.cancel(AnticheatManipulationLoop) end) end
     LocalPlayer:SetAttribute("SapphireLoaded", nil)
+    if DebugWindow and DebugWindow.Gui then pcall(function() DebugWindow.Gui:Destroy() end) end
     Library:Unload()
     if ESPLibrary then pcall(function() ESPLibrary:Unload() end) end
     if RemoteFolder:FindFirstChild("Crouch") then RemoteFolder.Crouch:FireServer(false) end
@@ -2922,6 +3106,9 @@ SettingsBox:AddDropdown("DPIDropdown", {
     Callback = function(Value) Library:SetDPIScale(tonumber((Value:gsub("%%", "")))) end,
 })
 SettingsBox:AddButton({ Text = "Unload Script", Func = function() Unload() end })
+SettingsBox:AddButton({ Text = "Show Debug Console", Func = function()
+    if DebugWindow and DebugWindow.Gui then DebugWindow.Gui.Enabled = true end
+end })
 
 local hubFolder = "Sapphire"
 local addonFolder = hubFolder .. "/Addons"
@@ -2940,21 +3127,23 @@ end
 
 local folder_path = "Sapphire"
 local file_path = "Doors"
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
-ThemeManager:SetFolder(folder_path)
-SaveManager:SetFolder(folder_path .. '/' .. file_path)
-SaveManager:BuildConfigSection(Tabs['UISettings'])
-ThemeManager:ApplyToTab(Tabs['UISettings'])
-SaveManager:GetAutoloadConfig()
-SaveManager:LoadAutoloadConfig()
-SaveManager:SaveAutoloadConfig()
+pcall(function()
+    ThemeManager:SetLibrary(Library)
+    SaveManager:SetLibrary(Library)
+    SaveManager:IgnoreThemeSettings()
+    SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+    ThemeManager:SetFolder(folder_path)
+    SaveManager:SetFolder(folder_path .. '/' .. file_path)
+    SaveManager:BuildConfigSection(Tabs['UISettings'])
+    ThemeManager:ApplyToTab(Tabs['UISettings'])
+    SaveManager:GetAutoloadConfig()
+    SaveManager:LoadAutoloadConfig()
+    SaveManager:SaveAutoloadConfig()
+end)
 
 Tabs.Info:UpdateWarningBox({
     Title = "All users must read",
-    Text = "[<font color=\"rgb(255,0,0)\">Leaker</font>] Bilibili UID:604520016\n<font color=\"rgb(255,0,0)\">Leaker</font> I don't know why you people scold him",
+    Text = "[<font color=\"rgb(255,0,0)\">Leaker</font>] Bilibili UID:604520016",
     IsNormal = true, Visible = true, LockSize = true,
 })
 Tabs.Addons:UpdateWarningBox({
@@ -2962,3 +3151,5 @@ Tabs.Addons:UpdateWarningBox({
     Text = "Addon path (Sapphire/Addons)",
     IsNormal = false, Visible = true, LockSize = true,
 })
+
+LogOk("=== BITICAL LOADED SUCCESSFULLY ===")
