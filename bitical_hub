@@ -1,6 +1,22 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 --  BITICAL HUB — Abysall ESP + Notifications + Hiding Timer + Figure GM
+--  Modified: outdoors-only Anti Surge, no slide-speed, +Disable Idle Kick,
+--            +Anti Entities (spawn-prevent + damage-bypass) in Anti box,
+--            +Abysall Environment auto-load
 -- ═══════════════════════════════════════════════════════════════════════════
+
+-- ═══════════ ABYSALL ENVIRONMENT (loaded so getconnections / fireproximityprompt work) ═══════════
+if not getgenv().Abysall or not getgenv().Abysall.Environment then
+    getgenv().Abysall = getgenv().Abysall or { Legit = true }
+    pcall(function()
+        local BaseUrl = "https://raw.githubusercontent.com/bocaj111004/Abysall/refs/heads/main/"
+        getgenv().Abysall.Environment = loadstring(game:HttpGet(BaseUrl .. "Components/Environment.luau"))()
+    end)
+end
+local AbysallEnv = (getgenv().Abysall and getgenv().Abysall.Environment) or {}
+local function Env(name, fallback)
+    return AbysallEnv[name] or fallback or _G[name]
+end
 
 -- ═══════════ DEBUG CONSOLE ═══════════
 local DebugWindow = (function()
@@ -58,9 +74,9 @@ local DebugWindow = (function()
     end
     return {
         Log = function(t) addEntry(t, Color3.fromRGB(200, 200, 200)) end,
-        Ok = function(t) addEntry(t, Color3.fromRGB(73, 230, 133)) end,
-        Warn = function(t) addEntry(t, Color3.fromRGB(255, 200, 60)) end,
-        Error = function(t) addEntry(t, Color3.fromRGB(255, 80, 80)) end,
+        Ok  = function(t) addEntry(t, Color3.fromRGB(73, 230, 133)) end,
+        Warn= function(t) addEntry(t, Color3.fromRGB(255, 200, 60)) end,
+        Error=function(t) addEntry(t, Color3.fromRGB(255, 80, 80)) end,
         Gui = gui,
     }
 end)()
@@ -171,7 +187,7 @@ Achievement = (function()
 end)()
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- ABYSALL-STYLE ESP LIBRARY (unified — all ESPs use this)
+-- ABYSALL-STYLE ESP LIBRARY (unified)
 -- ═══════════════════════════════════════════════════════════════════════════
 Log("Building Abysall ESP library...")
 
@@ -413,7 +429,7 @@ ReachBox   = Tabs.Player:AddLeftGroupbox('Reach')
 LobbyBox   = Tabs.Player:AddRightGroupbox("Lobby")
 MiscBox    = Tabs.Player:AddRightGroupbox("Misc")
 
-Anti              = Tabs.Exploits:AddLeftGroupbox('Entity Prevention')
+Anti              = Tabs.Exploits:AddLeftGroupbox('Anti Entities')
 Troll             = Tabs.Exploits:AddLeftGroupbox('Trolling')
 Bypass            = Tabs.Exploits:AddRightGroupbox('Bypass')
 ExploitsUniversal = Tabs.Exploits:AddRightGroupbox('Universal')
@@ -451,7 +467,7 @@ LogOk("Groupboxes created")
 
 Tabs.Homepage:UpdateWarningBox({
     Title = "Changelog:",
-    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Abysall ESP library (unified)\nAbysall SpeedBypass\nHiding timer fixed\nFigure Godmode restored</font>",
+    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Anti Surge now outdoors-only\nSlide SpeedHack removed\nDisable Idle Kick added\nAnti Entities combined (spawn-prevent + damage-bypass)\nAbysall Environment auto-loaded</font>",
     IsNormal = true, Visible = true, LockSize = true,
 })
 
@@ -594,10 +610,36 @@ Movement:AddToggle('InstantPrompt', { Text = "Instant Interaction", Default = fa
     end
 })
 Movement:AddToggle('NoClosetExitDelay', { Text = "No Exit Closet Delay", Default = false })
+
+-- ⭐ Anti AFK (basic) — kept as-is
 Movement:AddToggle('AntiAfk', { Text = "Anti AFK", Default = false })
 table.insert(Connections, LocalPlayer.Idled:Connect(function()
     if Toggles.AntiAfk.Value then VirtualUser:CaptureController(); VirtualUser:ClickButton2(Vector2.new()) end
 end))
+
+-- ⭐ NEW: Disable Idle Kick (Abysall style — via getconnections + VirtualUser fallback)
+Movement:AddToggle('DisableIdleKick', {
+    Text = "Disable Idle Kick",
+    Default = false,
+    Tooltip = "Prevents the 20-minute idle kick (Abysall method)."
+})
+Toggles.DisableIdleKick:OnChanged(function(Value)
+    local getconnections = Env("getconnections")
+    if getconnections then
+        pcall(function()
+            for _, Conn in ipairs(getconnections(LocalPlayer.Idled)) do
+                if Value then Conn:Disable() else Conn:Enable() end
+            end
+        end)
+    end
+end)
+table.insert(Connections, LocalPlayer.Idled:Connect(function()
+    if Toggles.DisableIdleKick.Value then
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end
+end))
+
 Movement:AddDivider()
 
 Movement:AddToggle('Noclip', { Text = "Noclip", Default = false }):AddKeyPicker('NoclipKeybind', {
@@ -983,20 +1025,41 @@ MiscBox:AddButton({ Text = "Copy Job ID", DoubleClick = false, Func = function()
     if setclipboard then setclipboard(game.JobId); Library:Notify("Copied Job ID") end
 end })
 
--- ═══════════ ENTITY PREVENTION ═══════════
-Anti:AddToggle('AntiDread', { Text = "Anti Dread", Default = false,
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ⭐ ANTI ENTITIES (combined — spawn-prevent + damage-bypass, Abysall style)
+-- ═══════════════════════════════════════════════════════════════════════════
+Log("Setting up Anti Entities...")
+
+-- FakeEvents for damage-bypass (Abysall method)
+local FakeEvents = {
+    Screech = Instance.new("RemoteEvent"),
+    Shade   = Instance.new("RemoteEvent"),
+    A90     = Instance.new("RemoteEvent"),
+    Surge   = Instance.new("RemoteEvent"),
+}
+FakeEvents.Screech.Name = "Screech"
+FakeEvents.Shade.Name   = "ShadeResult"
+FakeEvents.A90.Name     = "A90"
+FakeEvents.Surge.Name   = "SurgeRemote"
+FakeEvents.Screech_Real = RemoteFolder:FindFirstChild("Screech")
+FakeEvents.Shade_Real   = RemoteFolder:FindFirstChild("ShadeResult")
+FakeEvents.A90_Real     = RemoteFolder:FindFirstChild("A90")
+FakeEvents.Surge_Real   = RemoteFolder:FindFirstChild("SurgeRemote")
+
+-- --- Spawn-prevention toggles ---
+Anti:AddToggle('AntiDread', { Text = "Anti Dread (prevent spawn)", Default = false,
     Callback = function(v)
         local D = Modules:FindFirstChild("Dread") or Modules:FindFirstChild("_Dread")
         if D then D.Name = v and "_Dread" or "Dread" end
     end
 })
-Anti:AddToggle('AntiHalt', { Text = "Anti Halt", Default = false,
+Anti:AddToggle('AntiHalt', { Text = "Anti Halt (prevent spawn)", Default = false,
     Callback = function(v)
         local H = ClientModules.EntityModules:FindFirstChild("Shade") or ClientModules.EntityModules:FindFirstChild("_Shade")
         if H then H.Name = v and "_Shade" or "Shade" end
     end
 })
-Anti:AddToggle('AntiScreech', { Text = "Anti Screech", Default = false,
+Anti:AddToggle('AntiScreech', { Text = "Anti Screech (prevent spawn)", Default = false,
     Callback = function(v)
         local S = Modules:FindFirstChild("Screech") or Modules:FindFirstChild("_Screech")
         if S then S.Name = v and "_Screech" or "Screech" end
@@ -1005,6 +1068,12 @@ Anti:AddToggle('AntiScreech', { Text = "Anti Screech", Default = false,
 table.insert(Connections, workspace.CurrentCamera.ChildAdded:Connect(function(c)
     if c.Name == "GlitchScreech" and Toggles.AntiScreech and Toggles.AntiScreech.Value then c:Destroy() end
 end))
+Anti:AddToggle('AntiA90', { Text = "Anti A-90 (prevent spawn)", Default = false,
+    Callback = function(v)
+        local A = Modules:FindFirstChild("A90") or Modules:FindFirstChild("_A90")
+        if A then A.Name = v and "_A90" or "A90" end
+    end
+})
 Anti:AddToggle('AntiDupe', { Text = "Anti Dupe", Default = false,
     Callback = function(v)
         for _, room in ipairs(workspace.CurrentRooms:GetChildren()) do
@@ -1050,6 +1119,102 @@ Anti:AddToggle('AntiSnare', { Text = "Anti Snare", Default = false,
     end
 })
 
+Anti:AddDivider()
+
+-- --- Damage-bypass toggles (Abysall remote-swap method) ---
+Anti:AddToggle('NoScreechDamage', { Text = "No Screech Damage", Default = false,
+    Callback = function(v)
+        if not FakeEvents.Screech_Real then return end
+        if v then
+            FakeEvents.Screech.Parent = RemoteFolder
+            FakeEvents.Screech_Real.Parent = nil
+        else
+            FakeEvents.Screech_Real.Parent = RemoteFolder
+            FakeEvents.Screech.Parent = nil
+        end
+    end
+})
+Anti:AddToggle('NoHaltDamage', { Text = "No Halt Damage", Default = false,
+    Callback = function(v)
+        if not FakeEvents.Shade_Real then return end
+        if v then
+            FakeEvents.Shade.Parent = RemoteFolder
+            FakeEvents.Shade_Real.Parent = nil
+        else
+            FakeEvents.Shade_Real.Parent = RemoteFolder
+            FakeEvents.Shade.Parent = nil
+        end
+    end
+})
+Anti:AddToggle('NoA90Damage', { Text = "No A-90 Damage", Default = false,
+    Callback = function(v)
+        if not FakeEvents.A90_Real then
+            FakeEvents.A90_Real = RemoteFolder:FindFirstChild("A90")
+        end
+        if not FakeEvents.A90_Real then return end
+        if v then
+            FakeEvents.A90.Parent = RemoteFolder
+            FakeEvents.A90_Real.Parent = nil
+        else
+            FakeEvents.A90_Real.Parent = RemoteFolder
+            FakeEvents.A90.Parent = nil
+        end
+    end
+})
+
+-- ⭐ Anti Surge — OUTDOORS ONLY
+local AntiSurgeApplied = false
+local function IsOutdoors()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = { char }
+    local result = workspace:Raycast(hrp.Position, Vector3.new(0, 300, 0), params)
+    return result == nil
+end
+
+local function ApplyAntiSurgeState(active)
+    if not FakeEvents.Surge_Real then
+        FakeEvents.Surge_Real = RemoteFolder:FindFirstChild("SurgeRemote")
+    end
+    if not FakeEvents.Surge_Real then return end
+    if active and not AntiSurgeApplied then
+        FakeEvents.Surge.Parent = RemoteFolder
+        FakeEvents.Surge_Real.Parent = ReplicatedStorage
+        AntiSurgeApplied = true
+    elseif not active and AntiSurgeApplied then
+        FakeEvents.Surge_Real.Parent = RemoteFolder
+        FakeEvents.Surge.Parent = ReplicatedStorage
+        AntiSurgeApplied = false
+    end
+end
+
+Anti:AddToggle('NoSurgeDamage', {
+    Text = "No Surge Damage (outdoors only)",
+    Default = false,
+    Tooltip = "Only swaps the Surge remote while you are outdoors."
+})
+Toggles.NoSurgeDamage:OnChanged(function(v)
+    if not v then
+        ApplyAntiSurgeState(false)
+    end
+end)
+-- Background monitor: swap only while outdoors
+task.spawn(function()
+    while task.wait(0.5) do
+        if Library.Unloaded then break end
+        if Toggles.NoSurgeDamage and Toggles.NoSurgeDamage.Value then
+            ApplyAntiSurgeState(IsOutdoors())
+        end
+    end
+end)
+
+Anti:AddDivider()
+Anti:AddLabel({ Text = "Spawn-prevent toggles rename the entity module so it never loads. Damage-bypass toggles swap the remote event with a dummy.", DoesWrap = true })
+
 -- ═══════════ BYPASS ═══════════
 local nothitted = false
 task.spawn(function()
@@ -1065,7 +1230,7 @@ task.spawn(function()
     end
 end)
 
--- ⭐ ABYSALL SPEED BYPASS (exact port)
+-- ⭐ ABYSALL SPEED BYPASS
 SpeedBypassInterval = 0.216
 Bypass:AddDropdown("SpeedBypassMethod", {
     Values = {"Mass Switch", "Network Sleep"}, Default = 1, Multi = false, Text = "Speed Bypass Mode",
@@ -1104,19 +1269,16 @@ Bypass:AddToggle('SpeedBypass', {
                     task.wait(SpeedBypassInterval)
                     if alive then
                         if Options.SpeedBypassMethod.Value == "Mass Switch" then
-                            local CollisionClon = LocalPlayer.Character:FindFirstChild("_CollisionPart")
-                            local CollisionClon2 = LocalPlayer.Character:FindFirstChild("_CollisionPart2")
-                            if CollisionClon and CollisionClon2 then
+                            local cc1 = LocalPlayer.Character:FindFirstChild("_CollisionPart")
+                            local cc2 = LocalPlayer.Character:FindFirstChild("_CollisionPart2")
+                            if cc1 and cc2 then
                                 if Character.CollisionPart.Anchored or nothitted or (Toggles.AnticheatManipulation and Toggles.AnticheatManipulation.Value) then
-                                    CollisionClon.Massless = true
-                                    CollisionClon2.Massless = true
+                                    cc1.Massless = true; cc2.Massless = true
                                     task.wait(0.35)
                                 else
-                                    CollisionClon.Massless = true
-                                    CollisionClon2.Massless = true
+                                    cc1.Massless = true; cc2.Massless = true
                                     task.wait(SpeedBypassInterval)
-                                    CollisionClon2.Massless = false
-                                    CollisionClon.Massless = false
+                                    cc2.Massless = false; cc1.Massless = false
                                 end
                             end
                         end
@@ -1157,22 +1319,14 @@ task.spawn(function()
                 if alive then
                     local loop = RunService.RenderStepped:Connect(function()
                         if Toggles.SpeedBypass.Value and Options.SpeedBypassMethod.Value == "Network Sleep" then
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
-                            task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
-                            task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
-                            task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
-                            task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
-                            task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
-                            task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
-                            task.wait()
-                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
-                            task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true) task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false) task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true) task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false) task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false) task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false) task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true) task.wait()
+                            pcall(SetProperty, LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true) task.wait()
                         end
                     end)
                     task.wait()
@@ -1221,7 +1375,7 @@ Toggles.CrouchSpoof:OnChanged(function(v)
 end)
 Bypass:AddDivider()
 
-local cogAlt, slideSH, noSpread, fastThrow = false, false, false, false
+local cogAlt, noSpread, fastThrow = false, false, false
 local OGC1 = Character.LowerTorso and Character.LowerTorso.Root and Character.LowerTorso.Root.C1
 local hookNamecall
 
@@ -1254,33 +1408,7 @@ Bypass:AddToggle('NoSpread', { Text = 'No Spread', Default = false, Callback = f
 Bypass:AddToggle('FastThrow', { Text = 'Fast Throw', Default = false, Callback = function(value) fastThrow = value end })
 Bypass:AddDivider()
 
-local walkspeed, ladderspeed = 15, 15
-Bypass:AddToggle('SlideSpeedHack', { Text = 'Slide SpeedHack', Default = false,
-    Callback = function(value)
-        if value then
-            slideSH = true
-            if Toggles.SpeedBypass.Value then Toggles.SpeedBypass:SetValue(false) end
-            if not Connections.WalkSpeed then
-                Connections.WalkSpeed = RunService.RenderStepped:Connect(function()
-                    if Character and Character.Parent then
-                        Character:SetAttribute("SpeedBoostBehind", ladderspeed - 15)
-                        Character.Humanoid.WalkSpeed = walkspeed
-                    end
-                end)
-            end
-        else
-            slideSH = false
-            if Connections.WalkSpeed then Connections.WalkSpeed:Disconnect() Connections.WalkSpeed = nil end
-            if Character then
-                Character:SetAttribute("SpeedBoostBehind", 0)
-                Character.Humanoid.WalkSpeed = 15
-            end
-        end
-    end
-})
-Bypass:AddSlider("TplaysWalkSpeedHack", { Text="SpeedHack Walk", Default=15, Min=0, Max=75, Rounding=0, Compact=true, Callback=function(ws) walkspeed=ws end })
-Bypass:AddSlider("TplaysLadderSpeedHack", { Text="SpeedHack Ladder", Default=15, Min=0, Max=75, Rounding=0, Compact=true, Callback=function(ls) ladderspeed=ls end })
-Bypass:AddDivider()
+-- ⚠️ Slide Speed Hack REMOVED per request
 
 AnticheatManipulationLoop = nil; AnticheatManipulationEnabled = false; OriginalNoclipState = false
 Bypass:AddToggle('AnticheatManipulation', { Text = "Manipulator", Default = false,
@@ -1569,7 +1697,7 @@ task.spawn(function()
     end
 end)
 
--- ⭐ FIGURE GODMODE (RESTORED — Floors 1 & 2)
+-- ⭐ FIGURE GODMODE (restored)
 ExploitsUniversal:AddToggle('FigureGodmode', {
     Text = "Figure Godmode (Floors 1 & 2)", Default = false,
     Tooltip = "Prevents 'Figure' from hurting you on Hotel and Mines floors."
@@ -1630,20 +1758,7 @@ ExploitsUniversal:AddToggle('AntiSeekObstructions', {
     end
 })
 
-local FakeSurge = Instance.new("RemoteEvent", ReplicatedStorage)
-FakeSurge.Name = "SurgeRemote"
-ExploitsUniversal:AddToggle('AntiSurge', {
-    Text = "Anti Surge", Default = false,
-    Callback = function(v)
-        if v then
-            ReplicatedStorage.RemotesFolder.SurgeRemote.Parent = ReplicatedStorage
-            FakeSurge.Parent = ReplicatedStorage.RemotesFolder
-        else
-            ReplicatedStorage.RemotesFolder.SurgeRemote.Parent = ReplicatedStorage.RemotesFolder
-            FakeSurge.Parent = ReplicatedStorage
-        end
-    end
-})
+-- ⚠️ Old AntiSurge removed — new one lives in Anti groupbox (outdoors-only)
 
 -- ═══════════ TROLLING ═══════════
 Troll:AddToggle("Spamtoolz", { Text = "Abuse Others' Tools", Default = false }):AddKeyPicker("Spamtoolz_X", {
@@ -1665,7 +1780,7 @@ Troll:AddToggle('ThinkingAnimation', { Text = 'Thinking Animation', Default = fa
     end
 })
 
--- ═══════════ ESP SYSTEM (all using Abysall.ESPLibrary) ═══════════
+-- ═══════════ ESP SYSTEM ═══════════
 Log("Building ESP toggles...")
 
 ESP_Settings:AddToggle('RainbowESP', { Text = 'Rainbow ESP', Default = false, Callback = function(v) Abysall.ESPLibrary:SetRainbow(v) end })
@@ -2249,7 +2364,6 @@ NotifyBox:AddToggle('HidingTimeNotify', {
         end
     end
 })
--- Rebind hiding attribute on character respawn
 table.insert(Connections, LocalPlayer.CharacterAdded:Connect(function(newChar)
     if Toggles.HidingTimeNotify and Toggles.HidingTimeNotify.Value then
         if hidingAttributeConnection then hidingAttributeConnection:Disconnect() end
@@ -2782,12 +2896,6 @@ Toggles.AntiBanana:OnChanged(function(v)
     end
 end)
 
-FloorsModifiers:AddToggle('AntiA90', { Text = "Anti A90", Default = false,
-    Callback = function(v)
-        local A = Modules:FindFirstChild("A90") or Modules:FindFirstChild("_A90")
-        if A then A.Name = v and "_A90" or "A90" end
-    end
-})
 FloorsModifiers:AddToggle('AntiJam', { Text = "Anti Jamming", Default = false,
     Callback = function(v)
         local mt = SoundService:FindFirstChild("Main")
@@ -2836,10 +2944,9 @@ do
                         local args = {...}; args[1] = true
                         return original(self, unpack(args))
                     end
-                    if self.Name == "Crouch" and (cogAlt or slideSH) then
+                    if self.Name == "Crouch" and cogAlt then
                         local args = {...}
                         if cogAlt then args[1] = true end
-                        if slideSH then args[2] = true end
                         return original(self, unpack(args))
                     end
                 end
@@ -3058,26 +3165,32 @@ function Unload()
         "AnticheatBypass","DeleteFigure","AntiSeekFlood",
         "ABF","AntiKillbricks","TeleportToNextRoom","AntiVacuum","AntiLookman",
         "AntiDupe","AntiGloombatEggs","AntiGiggle","AntiJeff","AntiBanana",
-        "AntiSeekObstructions","AntiSeekingWall","AntiSurge","NoPuzzleDoors",
+        "AntiSeekObstructions","AntiSeekingWall","NoSurgeDamage","NoPuzzleDoors",
         "CrouchSpoof","VelocityManipulation","AntiA90","AntiJam","AntiGloomPile",
         "DoorSkipper","DisableMinesEcho","CollisionOffsetGodmodeAlt","NoSpread","FastThrow",
-        "SlideSpeedHack","Freecam","NoWardrobeVignette","RemoveAmbience","ReplaceGLwG",
+        "Freecam","NoWardrobeVignette","RemoveAmbience","ReplaceGLwG",
         "AntiGroundskeeper","AnticheatManipulation","PhantomNoclip","AntiEyes",
         "RemoveDRONESTAMPEDE","Door","HidingSpotESP","Chest","Items","GoldESP","Players",
         "TaskESP","Stardust","EntityESPToggleMain","NotifyEntitiesToggle","NotifyItemsToggle",
         "EntityChatToggle","InfiniteItems","InfiniteSItems","InfiniteCrucifix","AntiScreech",
         "Fieldofview","RainbowESP","ESPShowDistance","GlobalTracerEnabled",
-        "GlobalArrowsEnabled","FigureGodmode","HidingTimeNotify","SpeedBypass"
+        "GlobalArrowsEnabled","FigureGodmode","HidingTimeNotify","SpeedBypass",
+        "AntiDread","AntiHalt","NoScreechDamage","NoHaltDamage","NoA90Damage",
+        "DisableIdleKick","AntiSnare"
     }) do
         if Toggles[name] then pcall(function() Toggles[name]:SetValue(false) end) end
     end
     pcall(function() Phantom_Disable() end)
+    pcall(function() ApplyAntiSurgeState(false) end)
     pcall(function() Abysall.ESPLibrary:Unload() end)
     Globals_DRONE = false
-    if FakeSurge then FakeSurge:Destroy() end
     if ReplicatedStorage:FindFirstChild("SurgeRemote") then
         ReplicatedStorage.SurgeRemote.Parent = ReplicatedStorage.RemotesFolder
     end
+    if FakeEvents.Surge_Real then FakeEvents.Surge_Real.Parent = RemoteFolder end
+    if FakeEvents.Screech_Real then FakeEvents.Screech_Real.Parent = RemoteFolder end
+    if FakeEvents.Shade_Real then FakeEvents.Shade_Real.Parent = RemoteFolder end
+    if FakeEvents.A90_Real then FakeEvents.A90_Real.Parent = RemoteFolder end
     for _, c in ipairs(Connections) do
         if c and c.Connected then pcall(function() c:Disconnect() end) end
     end
