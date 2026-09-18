@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  BITICAL HUB + Abysall + Tplays + Cheesy Addons (FIXED)
+--  BITICAL HUB + Abysall + Tplays + Cheesy Addons (FIXED + OPTIMIZED)
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ═══════════ SECTION 1: SERVICES ═══════════
@@ -14,13 +14,12 @@ local Debris            = game:GetService("Debris")
 local Workspace         = workspace
 
 local LocalPlayer = Players.LocalPlayer
-if LocalPlayer:GetAttribute("SapphireLoaded") then print("[Dup] Script already loaded"); return end
+if LocalPlayer:GetAttribute("SapphireLoaded") then print("[Dup] Already loaded"); return end
 LocalPlayer:SetAttribute("SapphireLoaded", true)
 
--- ═══════════ SECTION 2: GAME REFS (with nil-safety) ═══════════
+-- ═══════════ SECTION 2: GAME REFS ═══════════
 Floor = ReplicatedStorage:WaitForChild("GameData"):WaitForChild("Floor")
 RemoteFolder = ReplicatedStorage:WaitForChild("RemotesFolder", 30)
-
 if not RemoteFolder then warn("RemotesFolder not found"); return end
 
 MainGame = LocalPlayer.PlayerGui:WaitForChild("MainUI", 30):WaitForChild("Initiator", 30):WaitForChild("Main_Game", 30)
@@ -36,6 +35,7 @@ local Crouch = RemoteFolder:WaitForChild("Crouch", 10)
 local ChangeModuleVariable = RemoteFolder:FindFirstChild("ChangeModuleVariable")
 local FireToolProjectile = RemoteFolder:FindFirstChild("FireToolProjectile")
 local deathhint = RemoteFolder:FindFirstChild("DeathHint")
+local SeatControl = RemoteFolder:FindFirstChild("SeatControl")
 
 -- ═══════════ SECTION 3: CHARACTER ═══════════
 Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -54,44 +54,28 @@ function Sound()
 end
 Sound()
 
-Character = LocalPlayer.Character
-pcall(function()
-    if Character.Collision:FindFirstChild("CollisionCrouch") then
-        Character.Collision.CollisionCrouch.Size = Vector3.new(0.5, 0.001, 3)
-    end
-end)
-
-CollisionClone = Character.CollisionPart:Clone()
-CollisionClone.Parent = Character
-CollisionClone.Massless = true
-CollisionClone.CanCollide = false
-CollisionClone.Name = "_CollisionPart"
-if CollisionClone:FindFirstChild("CollisionCrouch") then CollisionClone.CollisionCrouch:Destroy() end
-
-CollisionClone2 = Character.CollisionPart:Clone()
-CollisionClone2.Parent = Character
-CollisionClone2.Massless = true
-CollisionClone2.CanCollide = false
-CollisionClone2.Name = "_CollisionPart2"
-if CollisionClone2:FindFirstChild("CollisionCrouch") then CollisionClone2.CollisionCrouch:Destroy() end
-
--- ═══════════ SECTION 3B: ANTI CHAIR SIT (ALWAYS ON) ═══════════
+-- ═══════════ SECTION 3B: ANTI CHAIR SIT (SAFE — only blocks SeatControl) ═══════════
 do
-    local origNamecall
-    if hookmetamethod then
-        local ok = pcall(function()
+    if hookmetamethod and newcclosure and getnamecallmethod then
+        local origNamecall
+        local hookOk = pcall(function()
             origNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
                 local m = getnamecallmethod()
-                if m == "FireServer" and self and self.Name == "SeatControl" then
-                    return
+                -- SAFETY: only check .Name if self is an Instance (not a table/string)
+                if m == "FireServer" and typeof(self) == "Instance" and self.Name == "SeatControl" then
+                    return -- block sitting silently
                 end
                 return origNamecall(self, ...)
             end))
         end)
+        if not hookOk then
+            warn("[Bitical] Anti-Sit hook failed, falling back to remote destroy")
+        end
     end
-    -- Fallback: destroy any SeatControl remote that appears
+    -- Fallback: destroy SeatControl remote if it reappears
     task.spawn(function()
-        while task.wait(1) do
+        while task.wait(2) do
+            if LocalPlayer:GetAttribute("SapphireLoaded") == nil then break end
             local sc = RemoteFolder and RemoteFolder:FindFirstChild("SeatControl")
             if sc then pcall(function() sc:Destroy() end) end
         end
@@ -164,6 +148,7 @@ ESPLibrary.GlobalConfig.Arrows = false
 if Checkbox == nil then Library.ForceCheckbox = true else Library.ForceCheckbox = Checkbox end
 Library.NotifySide = "Right"
 Connections = {}
+addonLoaded = true
 
 Library:Notify("Loading Sapphire | Doors", 5)
 
@@ -245,7 +230,7 @@ SettingsBox = Tabs.UISettings:AddLeftGroupbox('UI', 'wrench')
 
 Tabs.Homepage:UpdateWarningBox({
     Title = "Changelog:",
-    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Anti Sit (auto-on)\nFixed Auto-Interact sitting\nImproved Anti Eyes\nESP Auto-Rescan\nSpeedBypass restored</font>",
+    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Anti Sit SAFE hook\nAuto-Interact chair skip\nESP Auto-Rescan\nSpeedBypass restored\nFixed freeze on load</font>",
     IsNormal = true, Visible = true, LockSize = true,
 })
 
@@ -520,7 +505,6 @@ table.insert(Connections, LocalPlayer.CharacterAdded:Connect(function()
 end))
 Movement:AddToggle("PhantomNoclip", {
     Text = "Phantom Noclip", Default = false,
-    Tooltip = "Noclip with phantom-like position protection.",
     Callback = function(state) if state then Phantom_Enable() else Phantom_Disable() end end,
 })
 Movement:AddSlider("PhantomTolerance", {
@@ -627,7 +611,7 @@ Automation:AddToggle('AutoInteract', {
             for _, v in ipairs(workspace.CurrentRooms:GetDescendants()) do
                 if v:IsA("ProximityPrompt") and not Ignore[v.Name] then
                     local pn = v.Parent and v.Parent.Name or ""
-                    if pn ~= "SeatPart" and pn ~= "Seat" and not pn:find("Chair") and not pn:find("Regal") then
+                    if pn ~= "SeatPart" and pn ~= "Seat" and not string.find(pn, "Chair") and not string.find(pn, "Regal") then
                         table.insert(AutoInteractTable, v)
                     end
                 end
@@ -2677,7 +2661,7 @@ FloorsFarm:AddButton({
     end
 })
 
--- ═══════════ SECTION 35: MAIN RENDER LOOP ═══════════
+-- ═══════════ SECTION 35: MAIN RENDER LOOP (CONSOLIDATED) ═══════════
 table.insert(Connections, RunService.RenderStepped:Connect(function()
     alive = LocalPlayer:GetAttribute("Alive")
     if not alive then return end
@@ -2797,7 +2781,7 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         Character.HumanoidRootPart.CanCollide = false
     end
 
-    -- ⭐ Auto Interact (SKIPS CHAIRS — no goto!)
+    -- Auto Interact (skips chairs)
     if Toggles.AutoInteract and Toggles.AutoInteract.Value then
         for _, prompt in ipairs(AutoInteractTable) do
             if prompt and prompt.Parent then
