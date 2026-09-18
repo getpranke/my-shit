@@ -211,10 +211,11 @@ User = Tabs.Homepage:AddLeftGroupbox("User Info", "user-round")
 Info = Tabs.Homepage:AddRightGroupbox("Info", "info")
 
 -- ─── Player ───
-Movement = Tabs.Player:AddLeftGroupbox("Movement")
-Automation = Tabs.Player:AddRightGroupbox('Automation')
-ReachBox = Tabs.Player:AddLeftGroupbox('Reach')
-MiscBox = Tabs.Player:AddRightGroupbox("Misc")
+Movement    = Tabs.Player:AddLeftGroupbox("Movement")
+Automation  = Tabs.Player:AddRightGroupbox('Automation')
+ReachBox    = Tabs.Player:AddLeftGroupbox('Reach')
+LobbyBox    = Tabs.Player:AddRightGroupbox("Lobby")
+MiscBox     = Tabs.Player:AddRightGroupbox("Misc")
 
 -- ─── Exploits ───
 Anti             = Tabs.Exploits:AddLeftGroupbox('Entity Prevention')
@@ -257,7 +258,7 @@ SettingsBox = Tabs.UISettings:AddLeftGroupbox('UI', 'wrench')
 
 Tabs.Homepage:UpdateWarningBox({
     Title = "Changelog:",
-    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Fixed Anti Jamming\nFixed UI style LinoriaLib\nImproved fake death\n+ Abysall & Tplays features\n+ Floor-sorted layout\n+ Show Current Floor button\n+ Archives & Stairwell features\n+ Phantom Noclip\n+ Retro Mod groupbox</font>",
+    Text = "//Doors//\n<font color=\"rgb(73,230,133)\">Fixed Anti Jamming\nFixed UI style LinoriaLib\nImproved fake death\n+ Abysall & Tplays features\n+ Floor-sorted layout\n+ Show Current Floor button\n+ Archives & Stairwell features\n+ Phantom Noclip\n+ Retro Mod groupbox\n+ Lobby Menu + Remove DRONESTAMPEDE</font>",
     IsNormal = true, Visible = true, LockSize = true,
 })
 
@@ -1035,13 +1036,54 @@ ReachBox:AddSlider("PromptReachMultiplier", {
 })
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- SECTION 13: PLAYER — MISC
+-- SECTION 13: PLAYER — LOBBY MENU
+-- ═══════════════════════════════════════════════════════════════════════════
+
+LobbyBox:AddButton({
+    Text = "Play Again",
+    DoubleClick = true,
+    Tooltip = "Joins a new run.",
+    Func = function()
+        if RemoteFolder and RemoteFolder:FindFirstChild("PlayAgain") then
+            RemoteFolder.PlayAgain:FireServer()
+            Library:Notify({ Title = "Lobby", Description = "Attempting to play again..." })
+        end
+    end
+})
+LobbyBox:AddButton({
+    Text = "Return to Lobby",
+    DoubleClick = true,
+    Tooltip = "Teleports you back to the lobby.",
+    Func = function()
+        if RemoteFolder and RemoteFolder:FindFirstChild("Lobby") then
+            RemoteFolder.Lobby:FireServer()
+            Library:Notify({ Title = "Lobby", Description = "Returning to lobby..." })
+        end
+    end
+})
+LobbyBox:AddButton({
+    Text = "Revive",
+    DoubleClick = true,
+    Tooltip = "Revives your character (needs a revive available).",
+    Func = function()
+        if RemoteFolder and RemoteFolder:FindFirstChild("Revive") then
+            RemoteFolder.Revive:FireServer()
+        end
+    end
+})
+LobbyBox:AddDivider()
+LobbyBox:AddLabel({ Text = "Quick-access lobby actions (from Abysall)", DoesWrap = true })
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- SECTION 13B: PLAYER — MISC
 -- ═══════════════════════════════════════════════════════════════════════════
 
 MiscBox:AddButton({ Text = "Reset Character", DoubleClick = true, Func = function() replicatesignal(LocalPlayer.Kill) end })
-MiscBox:AddButton({ Text = "Play Again", DoubleClick = true, Func = function() RemoteFolder.PlayAgain:FireServer() end })
-MiscBox:AddButton({ Text = "Return to Lobby", DoubleClick = true, Func = function() RemoteFolder.Lobby:FireServer() end })
-MiscBox:AddButton({ Text = "Revive Player", DoubleClick = true, Func = function() RemoteFolder.Revive:FireServer() end })
+MiscBox:AddButton({ Text = "Reset (Server)", DoubleClick = true, Func = function() RemoteFolder.Underwater:FireServer(true) end })
+MiscBox:AddButton({ Text = "Force Respawn", DoubleClick = true, Func = function() LocalPlayer.Character:BreakJoints() end })
+MiscBox:AddButton({ Text = "Copy Job ID", DoubleClick = false, Func = function()
+    if setclipboard then setclipboard(game.JobId) Library:Notify("Copied Job ID to clipboard") end
+end })
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- SECTION 14: EXPLOITS — ENTITY PREVENTION
@@ -1701,7 +1743,6 @@ do
     end)
 end
 
--- ⭐ Anti Seek Obstructions — FLOORS 1 & 2 (Hotel + Mines)
 ExploitsUniversal:AddToggle('AntiSeekObstructions', {
     Text = "Anti Seek Obstructions (Floors 1 & 2)", Default = false,
     Tooltip = "Prevents Seek chase obstacles from harming you (Hotel & Mines).",
@@ -2280,7 +2321,6 @@ FloorsMines:AddToggle('DeleteMinecart', { Text = "Delete Minecart", Default = fa
 FloorsMines:AddToggle('AntiSeekFlood', { Text = "Anti Seek Flood", Default = false })
 FloorsMines:AddToggle("ABF", { Text = "Anti Bridge Fall", Default = false })
 
--- ⭐ Anti Killbricks — MINES FLOOR (Floor 2)
 FloorsMines:AddToggle('AntiKillbricks', {
     Text = "Anti Killbricks (Floor 2)", Default = false,
     Tooltip = "Prevents 'Lava' from hurting you (Mines)."
@@ -2727,6 +2767,44 @@ FloorsRipple:AddButton({
 -- SECTION 29: FLOORS — ARCHIVES
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- ─── [ARCHIVES] Remove DRONESTAMPEDE ───
+local DRONESTAMPEDE_Running = false
+FloorsArchives:AddToggle('RemoveDRONESTAMPEDE', {
+    Text = "Remove DRONESTAMPEDE",
+    Default = false,
+    Tooltip = "Infinitely fires the ArchivesClock's LookedAtRemote while enabled.",
+    Callback = function(value)
+        if value then
+            if DRONESTAMPEDE_Running then return end
+            DRONESTAMPEDE_Running = true
+            task.spawn(function()
+                while DRONESTAMPEDE_Running do
+                    pcall(function()
+                        local room5 = workspace.CurrentRooms:FindFirstChild("5")
+                        if room5 then
+                            local assets = room5:FindFirstChild("Assets")
+                            if assets then
+                                local clock = assets:FindFirstChild("ArchivesClock")
+                                if clock then
+                                    local evt = clock:FindFirstChild("LookedAtRemote")
+                                    if evt and evt:IsA("RemoteEvent") then
+                                        evt:FireServer()
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)
+        else
+            DRONESTAMPEDE_Running = false
+        end
+    end
+})
+FloorsArchives:AddDivider()
+
+-- ─── [ARCHIVES] Locker Autoloot ───
 local ArchivesLockerRunning = false
 local ArchivesLockers = {}
 local ArchivesLockerDelay = 0.8
@@ -2778,6 +2856,7 @@ FloorsArchives:AddSlider("ArchivesLockerCooldown", {
     Callback = function(value) ArchivesLockerDelay = value end
 })
 
+-- ─── [ARCHIVES] Honcho ESP ───
 local HonchoESPEnabled = false
 local HonchoBossActive = false
 local HonchoBossDefeated = false
@@ -3058,6 +3137,7 @@ FloorsArchives:AddButton({
     Func = function() if HonchoESPEnabled then Honcho_scanAllStages() end end
 })
 
+-- ─── [ARCHIVES] Water Cooler Autodrink ───
 local ArchivesCoolerBusy = false
 local ArchivesCoolerDelay = 0.5
 local ArchivesCoolerCupTimeout = 1
@@ -3442,7 +3522,6 @@ FloorsStairwell:AddLabel({
 -- SECTION 31: FLOORS — RETRO MOD
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- ⭐ Anti Seeking Wall — RETRO MOD floor only
 FloorsRetroMod:AddToggle('AntiSeekingWall', {
     Text = "Anti Seeking Wall",
     Default = false,
@@ -3739,13 +3818,15 @@ function Unload()
         "SlideSpeedHack","Freecam","NoWardrobeVignette","RemoveAmbience","ReplaceGLwG",
         "CurrentHideTime","HidingRoomNotify","InvisibleGrumbles","AntiGroundskeeper","ThinkingAnimation",
         "AnticheatManipulation","PhantomNoclip",
-        "ArchivesLockerAutoloot","HonchoESPToggle","StairwellLandingESP","CartESP","TVStandESP","FireAlarmESP"
+        "ArchivesLockerAutoloot","HonchoESPToggle","StairwellLandingESP","CartESP","TVStandESP","FireAlarmESP",
+        "RemoveDRONESTAMPEDE"
     }) do
         if Toggles[name] then pcall(function() Toggles[name]:SetValue(false) end) end
     end
     pcall(function() Archives_stop() end)
     pcall(function() Honcho_stopESP() end)
     pcall(function() Phantom_Disable() end)
+    DRONESTAMPEDE_Running = false
     SW_StairwellEnabled = false; SW_CartEnabled = false; SW_TVStandEnabled = false; SW_FireAlarmEnabled = false
     SW_ClearESP(SW_trackedStairwell); SW_ClearESP(SW_trackedCarts)
     SW_ClearESP(SW_trackedTVStands); SW_ClearESP(SW_trackedFireAlarms)
